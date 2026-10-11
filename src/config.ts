@@ -1,12 +1,7 @@
-/**
- * Site-wide configuration.
- *
- * NOTE: EMAIL is a placeholder — adjust to your actual address.
- */
 export const SITE = {
   name: "Henning Petersen",
   domain: "henningpetersen.com",
-  email: "info@henningpetersen.com",
+  email: "hp@henningpetersen.com",
   companyUrl: "https://daenen4.de",
   companyLabel: "daenen4.de",
 } as const;

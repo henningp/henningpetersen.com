@@ -22,8 +22,6 @@ Language: auto-detected from the browser locale on first visit, switchable in
 the top-right corner, choice remembered via `localStorage`. To change copy or
 the email/company links, edit `src/config.ts` and `src/pages/index.astro`.
 
-> ⚠️ The email address in `src/config.ts` (`info@henningpetersen.com`) is a
-> **placeholder** — set it to your real address before deploying.
 
 ## One-time AWS setup
 
