@@ -1,0 +1,296 @@
+---
+import { SITE } from "../config";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{SITE.name}</title>
+    <meta name="description" content={`${SITE.name} — ${SITE.domain}`} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta property="og:title" content={SITE.name} />
+    <meta property="og:description" content={SITE.domain} />
+    <script>
+      // Runs before first paint: apply persisted or auto-detected locale.
+      (function () {
+        var stored = localStorage.getItem("locale");
+        var locale =
+          stored === "en" || stored === "de"
+            ? stored
+            : (navigator.language || "en").toLowerCase().startsWith("de")
+              ? "de"
+              : "en";
+        document.documentElement.setAttribute("data-locale", locale);
+        document.documentElement.setAttribute("lang", locale);
+      })();
+    </script>
+  </head>
+  <body>
+    <header>
+      <nav aria-label="Language" class="lang-toggle">
+        <button type="button" data-choose-locale="en" aria-pressed="false">EN</button>
+        <span class="lang-sep" aria-hidden="true">/</span>
+        <button type="button" data-choose-locale="de" aria-pressed="false">DE</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="card" aria-live="polite">
+        <h1
+          >{SITE.name}
+        </h1>
+
+        <p data-locale-content="en">
+          This domain is currently dedicated to email correspondence. My
+          professional work is at <strong>{SITE.companyLabel}</strong>.
+        </p>
+        <p data-locale-content="de" hidden>
+          Diese Domain ist derzeit ausschließlich der E-Mail-Korrespondenz
+          vorbehalten. Meine berufliche Arbeit findet sich unter
+          <strong>{SITE.companyLabel}</strong>.
+        </p>
+
+        <div class="actions">
+          <a class="btn primary" href={SITE.companyUrl}
+            ><span data-locale-content="en">Go to</span>
+            <span data-locale-content="de" hidden>Zu</span>
+            <span class="btn-host">{SITE.companyLabel}</span>
+            <span
+              aria-hidden="true"
+            >&rarr;</span
+          ></a>
+          <a class="btn" href={`mailto:${SITE.email}`}>
+            <span data-locale-content="en">Send an email</span>
+            <span data-locale-content="de" hidden>E-Mail schreiben</span>
+          </a>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
+          &middot; {SITE.domain}
+        </p>
+      </footer>
+    </main>
+
+    <script>
+      (function () {
+        var html = document.documentElement;
+
+        function apply(loc) {
+          html.setAttribute("data-locale", loc);
+          html.setAttribute("lang", loc);
+          try {
+            localStorage.setItem("locale", loc);
+          } catch {}
+          document.querySelectorAll("[data-locale-content]").forEach(function (el) {
+            el.hidden = el.getAttribute("data-locale-content") !== loc;
+          });
+          document
+            .querySelectorAll("[data-choose-locale]")
+            .forEach(function (btn) {
+              btn.setAttribute(
+                "aria-pressed",
+                String(btn.getAttribute("data-choose-locale") === loc),
+              );
+            });
+          document.title =
+            loc === "de"
+              ? "Henning Petersen – E-Mail"
+              : "Henning Petersen";
+        }
+
+        document.querySelectorAll("[data-choose-locale]").forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            apply(btn.getAttribute("data-choose-locale"));
+          });
+        });
+
+        // Sync initial state (apply may not have run after head script set it).
+        apply(html.getAttribute("data-locale") || "en");
+      })();
+    </script>
+
+    <style>
+      :root {
+        --bg: #f4f5f7;
+        --card: #ffffff;
+        --text: #1a1d23;
+        --muted: #5c6370;
+        --border: #dfe2e8;
+        --accent: #1d4ed8;
+        --accent-contrast: #ffffff;
+        --btn-text: #1a1d23;
+        --btn-border: #cfd4dc;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #101216;
+          --card: #181b21;
+          --text: #e7e9ee;
+          --muted: #9aa1ad;
+          --border: #2a2e36;
+          --accent: #6d92f5;
+          --accent-contrast: #0b0d12;
+          --btn-text: #e7e9ee;
+          --btn-border: #3a3f4a;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family:
+          ui-sans-serif,
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          Arial,
+          sans-serif;
+        line-height: 1.6;
+        color: var(--text);
+        background: var(--bg);
+        min-height: 100dvh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      header {
+        padding: 1rem 1.5rem 0;
+      }
+      .lang-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        font-variant-numeric: tabular-nums;
+      }
+      .lang-toggle button {
+        appearance: none;
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font: inherit;
+        padding: 0.25rem 0.5rem;
+        border-radius: 0.4rem;
+        cursor: pointer;
+      }
+      .lang-toggle button[aria-pressed="true"] {
+        color: var(--text);
+        font-weight: 600;
+        background: color-mix(in srgb, var(--text) 8%, transparent);
+      }
+      .lang-toggle button:hover {
+        color: var(--text);
+      }
+      .lang-sep {
+        color: var(--muted);
+        opacity: 0.6;
+      }
+
+      main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 2.5rem;
+        padding: 2rem 1.5rem;
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 1rem;
+        padding: 2.5rem 2.25rem;
+        max-width: 28rem;
+        width: 100%;
+        box-shadow:
+          0 1px 2px rgb(0 0 0 / 6%),
+          0 12px 32px -16px rgb(0 0 0 / 12%);
+      }
+      .card h1 {
+        margin: 0 0 0.75rem;
+        font-size: 1.5rem;
+        line-height: 1.25;
+        letter-spacing: -0.01em;
+      }
+      .card p {
+        margin: 0;
+        color: var(--muted);
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.75rem;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.6rem 1rem;
+        border: 1px solid var(--btn-border);
+        border-radius: 0.6rem;
+        color: var(--btn-text);
+        text-decoration: none;
+        font-size: 0.95rem;
+        background: transparent;
+        transition:
+          background 0.15s ease,
+          border-color 0.15s ease,
+          transform 0.05s ease;
+      }
+      .btn:hover {
+        border-color: var(--muted);
+        background: color-mix(in srgb, var(--text) 5%, transparent);
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn-host {
+        font-weight: 600;
+      }
+      .btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: var(--accent-contrast);
+      }
+      .btn.primary:hover {
+        background: color-mix(in srgb, var(--accent), black 8%);
+      }
+      .btn:focus-visible,
+      .lang-toggle button:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      footer {
+        padding: 0 1.5rem 2rem;
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      footer a {
+        color: var(--muted);
+        text-decoration: none;
+        border-bottom: 1px solid var(--border);
+      }
+      footer a:hover {
+        color: var(--text);
+      }
+    </style>
+  </body>
+</html>
