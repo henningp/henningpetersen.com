@@ -21,6 +21,11 @@ output "certificate_arn" {
   value = aws_acm_certificate.site.arn
 }
 
+output "route53_name_servers" {
+  description = "The 4 nameservers to point your registrar / Host Europe 'NS Delegate' at, AFTER `terraform apply` has created every record. Only then does Route 53 become authoritative."
+  value       = aws_route53_zone.site.name_servers
+}
+
 output "certificate_validation" {
   description = "CNAME records to add at your DNS provider until the certificate is issued: type CNAME, TTL 60, value = the string shown here"
   value = {

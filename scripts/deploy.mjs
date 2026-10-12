@@ -1,26 +1,28 @@
 #!/usr/bin/env node
 /**
  * Deployment pipeline:
- *   1. Build the site            (pnpm exec astro build)
- *   2. Upload to S3              (aws s3 sync --delete)
- *   3. Invalidate CloudFront     (aws cloudfront create-invalidation)
+ *   1. Build the site        (pnpm exec astro build)
+ *   2. Upload to S3          (aws s3 sync --delete, versioned)
+ *   3. Invalidate CloudFront (aws cloudfront create-invalidation)
  *
- * Credentials come from the AWS CLI profile, e.g. via `aws configure sso`.
- * Bucket / distribution are read from Terraform outputs (infra/), unless
- * BUCKET / DISTRIBUTION_ID env vars are set (useful before `terraform apply`).
+ * Credentials come from the default AWS CLI profile (~/.aws).
+ * Bucket + distribution are read from the Terraform outputs in infra/
+ * (keys `bucket_name` / `distribution_id`), unless overridden by env vars
+ * BUCKET / DISTRIBUTION_ID — handy before the first `terraform apply`.
  *
  * Usage: pnpm deploy
  */
 import { execFileSync } from "node:child_process";
+import { join } from "node:path";
 
 const projectRoot = new URL("..", import.meta.url).pathname;
-const infraDir = new URL("./infra", import.meta.url).pathname;
+const infraDir = join(projectRoot, "infra");
 
 function run(cmd, args, opts = {}) {
   const out = execFileSync(cmd, args, {
     encoding: "utf8",
     stdio: opts.quiet ? ["pipe", "pipe", "inherit"] : "inherit",
-    ...opts,
+     ...opts,
   });
   return out?.trim() ?? "";
 }
@@ -30,33 +32,41 @@ function fail(msg) {
   process.exit(1);
 }
 
-function requireEnvOrOutput(name, outputs) {
-  const value = process.env[name] ?? outputs?.[name]?.value;
-  if (!value) {
-    fail(
-      `${name} not found. Set it as an env var, or run the Terraform apply first ` +
-        `(cd infra && terraform init && terraform apply).`,
-    );
-  }
-  return value;
-}
-
 // 1. Build -------------------------------------------------------------------
 console.log("▸ Building site…");
 run("pnpm", ["exec", "astro", "build"], { cwd: projectRoot });
 
 // 2. Resolve bucket + distribution -------------------------------------------
+// Env vars win; otherwise read the Terraform outputs (bucket_name /
+// distribution_id). If there is no state yet, fall back to nothing and let the
+// per-value check below explain what to set.
 let outputs = {};
 try {
   outputs = JSON.parse(
-    run("terraform", ["output", "-json", "-chdir", infraDir], { quiet: true }),
+    run("terraform", ["output", "-json"], { cwd: infraDir, quiet: true }),
   );
 } catch {
-  // No Terraform state yet — fall back to env vars only.
+  outputs = {};
 }
 
-const bucket = requireEnvOrOutput("BUCKET", outputs);
-const distributionId = requireEnvOrOutput("DISTRIBUTION_ID", outputs);
+const value = (envName, outputKey) =>
+  process.env[envName] ?? outputs[outputKey]?.value;
+
+const bucket = value("BUCKET", "bucket_name");
+const distributionId = value("DISTRIBUTION_ID", "distribution_id");
+
+if (!bucket) {
+  fail(
+    "BUCKET not found. Set it as an env var, or run the Terraform apply first " +
+      "(cd infra && terraform init && terraform apply).",
+  );
+}
+if (!distributionId) {
+  fail(
+    "DISTRIBUTION_ID not found. Set it as an env var, or run the Terraform apply first " +
+      "(cd infra && terraform init && terraform apply).",
+  );
+}
 
 console.log(
   `\n▸ Uploading dist/ → s3://${bucket} (distribution ${distributionId})`,

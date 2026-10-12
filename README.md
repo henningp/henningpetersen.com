@@ -5,17 +5,17 @@ to email; the visible message links to <https://daenen4.de>.
 
 - **Site:** [Astro](https://astro.build) + TypeScript, fully static → `dist/`
 - **Infra (Terraform, `infra/`):**
-  - S3 bucket in **eu-central-1 (Frankfurt)**, private, versioned, SSE
-  - CloudFront distribution (global, Frankfurt edge for EU visitors) + ACM cert
+   - S3 bucket in **eu-central-1 (Frankfurt)**, private, versioned, SSE
+   - CloudFront distribution (global, Frankfurt edge for EU visitors) + ACM cert
 - **Deploy:** `pnpm deploy` → build, `aws s3 sync`, CloudFront invalidation
-- **Auth:** AWS CLI with IAM Identity Center (SSO) — no long-lived keys
+- **Auth:** a scoped IAM user with a static access key (no SSO) — see below
 
 ## Local development
 
 ```sh
 pnpm install
-pnpm dev          # http://localhost:4321
-pnpm build        # outputs to dist/
+pnpm dev           # http://localhost:4321
+pnpm build         # outputs to dist/
 ```
 
 Language: auto-detected from the browser locale on first visit, switchable in
@@ -25,54 +25,60 @@ the email/company links, edit `src/config.ts` and `src/pages/index.astro`.
 
 ## One-time AWS setup
 
-### 1. IAM Identity Center (SSO)
+This uses **one scoped IAM user** (`henning-deploy`) with a static access key.
+It holds no `*` wildcards except where CloudFront requires it
+(`Resource: "arn:aws:cloudfront::<account>:*"` — CloudFront does not permit
+per-distribution ARN-based restrictions at apply time).
 
-1. Enable **IAM Identity Center** (https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html).
-   Free for a personal account; requires your AWS account as a trusted entity
-   and an active MFA device on your root user.
-2. Create a **Permission set** (e.g. `henningpetersen.s3-deploy`), 30 days,
-   MFA optional, and attach a policy scoped to this bucket only:
+### 1. IAM user `henning-deploy`
 
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [
-       {
-         "Sid": "S3Deploy",
-         "Effect": "Allow",
-         "Action": [
-           "s3:PutObject",
-           "s3:DeleteObject",
-           "s3:ListBucket",
-           "s3:GetBucketLocation"
-         ],
-         "Resource": [
-           "arn:aws:s3:::henningpetersen-com",
-           "arn:aws:s3:::henningpetersen-com/*"
-         ]
-       },
-       {
-         "Sid": "CloudFrontInvalidate",
-         "Effect": "Allow",
-         "Action": [
-           "cloudfront:CreateInvalidation",
-           "cloudfront:GetDistribution",
-           "cloudfront:ListInvalidations"
-         ],
-         "Resource": "*"
-       }
-     ]
-   }
-   ```
-3. Assign your root/primary account user (or a dedicated SSO user) to the
-   permission set for this AWS account.
-
-### 2. Configure the AWS CLI
+Create the user, add a single access key, and copy both into
+`~/.aws/credentials` (profile `default`):
 
 ```sh
-aws configure sso          # follow the prompts (SSO URL from your IIC config)
-aws sso login              # opens the browser OAuth loop; tokens refresh automatically
+aws iam create-user henning-deploy
+aws iam create-access-key --user-name henning-deploy   # save the secret
 ```
+
+~/.aws/credentials
+
+```ini
+[default]
+aws_access_key_id = AKIA...
+aws_secret_access_key = ...
+```
+
+~/.aws/config
+
+```ini
+[default]
+region = eu-central-1
+output = json
+```
+
+### 2. Scoped policy (single inline policy on `henning-deploy`)
+
+| Statement   | Scope                                                        | Purpose                        |
+|-------------|--------------------------------------------------------------|--------------------------------|
+| `SiteBucket`| `arn:aws:s3:::henningpetersen-com(/*)` + `s3:ListAllMyBuckets` | S3 write + Terraform reads  |
+| `SiteCloudFront`| `arn:aws:cloudfront::<account>:*`                      | Create/read/invalidate CDN     |
+| `SiteAcm`   | `arn:aws:acm:us-east-1:<account>:certificate/*`           | Issue + validate cert          |
+
+`SiteBucket` needs several S3 read actions that do **not** fall under the
+`GetBucket*` / `PutBucket*` prefixes and were added one pair at a time as the
+Terraform refresh path demanded them:
+
+- `s3:Get/PutAccelerateConfiguration`
+- `s3:Get/PutEncryptionConfiguration`
+- `s3:Get/PutLifecycleConfiguration`
+- `s3:Get/PutReplicationConfiguration`
+
+Along with the standard set:
+`CreateBucket, DeleteBucket, GetBucket*, PutBucket*, ListBucket,
+GetObject, PutObject, DeleteObject, ListAllMyBuckets`.
+
+`SiteCloudFront` also needs the tag action used by
+`CreateDistributionWithTags`: `cloudfront:TagResource`.
 
 ### 3. Apply Terraform
 
@@ -85,17 +91,24 @@ terraform apply
 Outputs you need at your DNS provider:
 
 - `certificate_validation` — CNAME records (type **CNAME**, TTL 60) until the
-  ACM certificate is issued. Check with
-  `aws acm describe-certificate --certificate-arn <arn> --region us-east-1`
-  until it says `ISSUED`.
+  ACM certificate is issued. AWS provider v6 does **not** wait for this during
+  apply — add the CNAMEs yourself, then check with
+  `aws acm get-certificate --certificate-arn <arn> --region us-east-1`
+  (it errors precisely while validation is still pending, so success = issued).
 - `distribution_domain` — the CloudFront domain, e.g.
   `d12ab3c4d5e6f7.cloudfront.net`.
 
-### 4. DNS (at your zone provider, where the MX records already live)
+### 4. DNS (at Host Europe, where the MX records already live)
 
-- `henningpetersen.com` → CNAME → `<distribution_domain>`
-- `www.henningpetersen.com` → CNAME → `<distribution_domain>` (optional)
+Host Europe only allows CNAME on subdomains, so the apex is handled by a
+provider-specific 301 redirect rather than a record:
+
+- `www.henningpetersen.com` → **CNAME** → `<distribution_domain>`
+- `henningpetersen.com` (apex) → **301 redirect** → `https://www.henningpetersen.com`
 - **Do not touch** the existing MX / SPF / DMARC records.
+
+If your zone is managed elsewhere, both apex and www can go straight to
+`<distribution_domain>` as CNAMEs.
 
 ## Deploy
 

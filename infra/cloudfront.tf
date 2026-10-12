@@ -1,4 +1,6 @@
 # Grants CloudFront (and only CloudFront, via OAC) read access to the bucket.
+# origin_access_control_origin_type must be "s3" so it pairs with an S3-typed
+# distribution origin — no custom_origin_config allowed on S3 origins.
 resource "aws_cloudfront_origin_access_control" "site" {
   name                              = "${var.bucket_name}-oac"
   origin_access_control_origin_type = "s3"
@@ -28,13 +30,6 @@ resource "aws_cloudfront_distribution" "site" {
     domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
     origin_id                = "s3-${var.bucket_name}"
     origin_access_control_id = aws_cloudfront_origin_access_control.site.id
-
-    custom_origin_config {
-      http_port                = 443
-      https_port               = 443
-      origin_protocol_policy   = "https-only"
-      origin_ssl_protocols     = ["TLSv1.2", "TLSv1.3"]
-    }
   }
 
   default_cache_behavior {
