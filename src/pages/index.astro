@@ -38,18 +38,19 @@ import { SITE } from "../config";
 
     <main>
       <section class="card" aria-live="polite">
-        <h1
-          >{SITE.name}
+        <h1>
+          <span class="greeting" data-locale-content="en">Good afternoon!</span>
+          <span class="greeting" data-locale-content="de" hidden>Guten Tag</span>
         </h1>
 
         <p data-locale-content="en">
           This domain is currently dedicated to email correspondence. My
-          professional work is at <strong>{SITE.companyLabel}</strong>.
+          professional work is at <a class="domain-link" href={SITE.companyUrl}>{SITE.companyLabel}</a>.
         </p>
         <p data-locale-content="de" hidden>
           Diese Domain ist derzeit ausschließlich der E-Mail-Korrespondenz
           vorbehalten. Meine berufliche Arbeit findet sich unter
-          <strong>{SITE.companyLabel}</strong>.
+          <a class="domain-link" href={SITE.companyUrl}>{SITE.companyLabel}</a>.
         </p>
 
         <div class="actions">
@@ -71,12 +72,13 @@ import { SITE } from "../config";
       <footer>
         <p>
           <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
-          &middot; {SITE.domain}
         </p>
       </footer>
     </main>
 
     <script>
+      import { pickGreeting } from "../config";
+
       (function () {
         var html = document.documentElement;
 
@@ -101,6 +103,12 @@ import { SITE } from "../config";
             loc === "de"
               ? "Henning Petersen – E-Mail"
               : "Henning Petersen";
+
+        // Show the time-of-day greeting for the active locale.
+        document.querySelectorAll(".greeting").forEach(function (g) {
+          if (g.getAttribute("data-locale-content") === loc)
+            g.textContent = pickGreeting(loc, new Date().getHours());
+        });
         }
 
         document.querySelectorAll("[data-choose-locale]").forEach(function (btn) {
@@ -111,6 +119,12 @@ import { SITE } from "../config";
 
         // Sync initial state (apply may not have run after head script set it).
         apply(html.getAttribute("data-locale") || "en");
+
+        // Refresh the greeting on a light cadence so a tab left open across a
+        // time boundary still shows the right one.
+        setInterval(function () {
+            apply(html.getAttribute("data-locale") || "en");
+          }, 60000);
       })();
     </script>
 
@@ -230,6 +244,15 @@ import { SITE } from "../config";
         margin: 0;
         color: var(--muted);
       }
+      .card p a.domain-link {
+        color: var(--accent);
+        font-weight: 600;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .card p a.domain-link:hover {
+        color: color-mix(in srgb, var(--accent), black 12%);
+      }
 
       .actions {
         display: flex;
@@ -272,6 +295,7 @@ import { SITE } from "../config";
         background: color-mix(in srgb, var(--accent), black 8%);
       }
       .btn:focus-visible,
+      .card p a.domain-link:focus-visible,
       .lang-toggle button:focus-visible {
         outline: 2px solid var(--accent);
         outline-offset: 2px;
