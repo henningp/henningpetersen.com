@@ -72,6 +72,28 @@ import { SITE } from "../config";
         <p>
           <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
         </p>
+        <details class="imprint">
+          <summary>
+            <span data-locale-content="en">Legal notice</span>
+            <span data-locale-content="de" hidden>Impressum</span>
+          </summary>
+          <div class="imprint-body">
+            <p data-locale-content="de" hidden>Angaben gemäß § 5 DDG:</p>
+            <address>
+              {SITE.name}
+              <br />
+              Boxhagener Str. 43
+              <br />
+              10245 Berlin
+              <br />
+              <span data-locale-content="en">Germany</span><span data-locale-content="de" hidden>Deutschland</span>
+            </address>
+            <p>
+              <span data-locale-content="en">Email</span><span data-locale-content="de" hidden>E-Mail</span>:
+              <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
+            </p>
+          </div>
+        </details>
       </footer>
     </main>
 
@@ -312,6 +334,31 @@ import { SITE } from "../config";
       }
       footer a:hover {
         color: var(--text);
+      }
+
+      footer .imprint {
+        margin-top: 0.75rem;
+      }
+      footer .imprint > summary {
+        display: inline;
+        cursor: pointer;
+        color: var(--muted);
+        text-decoration: none;
+        border-bottom: 1px solid var(--border);
+        list-style: none;
+      }
+      footer .imprint > summary::-webkit-details-marker {
+        display: none;
+      }
+      footer .imprint > summary:hover
+      footer .imprint[open] > summary {
+        color: var(--text);
+      }
+      footer .imprint-body {
+        margin-top: 0.75rem;
+      }
+      footer .imprint-body address {
+        font-style: normal;
       }
     </style>
   </body>
