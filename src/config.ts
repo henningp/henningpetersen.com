@@ -35,9 +35,9 @@ export const GREETINGS: Record<Locale, GreetingBand[]> = {
       { from: 18, text: "Good evening!" },
     ],
   de: [
-      { from: 5, text: "Guten Morgen" },
-      { from: 10, text: "Guten Tag" },
-      { from: 18, text: "Guten Abend" },
+      { from: 5, text: "Guten Morgen!" },
+      { from: 10, text: "Guten Tag!" },
+      { from: 18, text: "Guten Abend!" },
     ],
 };
 
