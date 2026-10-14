@@ -44,12 +44,11 @@ import { SITE } from "../config";
         </h1>
 
         <p data-locale-content="en">
-          This domain is currently dedicated to email correspondence. My
-          professional work is at <a class="domain-link" href={SITE.companyUrl}>{SITE.companyLabel}</a>.
+          This domain is currently used for email only. My work website is at
+          <a class="domain-link" href={SITE.companyUrl}>{SITE.companyLabel}</a>.
         </p>
         <p data-locale-content="de" hidden>
-          Diese Domain ist derzeit ausschließlich der E-Mail-Korrespondenz
-          vorbehalten. Meine berufliche Arbeit findet sich unter
+          Diese Domain wird im Moment nur für E-Mail benutzt. Meine berufliche Website findet sich unter
           <a class="domain-link" href={SITE.companyUrl}>{SITE.companyLabel}</a>.
         </p>
 
@@ -246,7 +245,6 @@ import { SITE } from "../config";
       }
       .card p a.domain-link {
         color: var(--accent);
-        font-weight: 600;
         text-decoration: underline;
         text-underline-offset: 2px;
       }
