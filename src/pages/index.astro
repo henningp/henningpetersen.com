@@ -94,6 +94,59 @@ import { SITE } from "../config";
             </p>
           </div>
         </details>
+        <details class="imprint">
+          <summary>
+            <span data-locale-content="en">Privacy</span>
+            <span data-locale-content="de" hidden>Datenschutz</span>
+          </summary>
+          <div class="imprint-body">
+            <p data-locale-content="en">
+              This website is hosted on AWS. When you open a page, your IP
+              address is transmitted so the content can be delivered. We do not
+              store IP addresses or any other visitor data; our hosting provider
+              AWS acts as a data processor under its standard data processing
+              agreement.
+            </p>
+            <p data-locale-content="de" hidden>
+              Diese Website wird über AWS betrieben. Beim Öffnen einer Seite wird
+              Ihre IP-Adresse übermittelt, damit die Inhalte ausgeliefert werden
+              können. Wir speichern keine IP-Adressen oder sonstige Besucherdaten;
+              unser Hoster AWS ist ein Auftragsverarbeiter gemäß Art. 28 DSGVO.
+            </p>
+            <p data-locale-content="en">
+              Your chosen language is stored only in your browser's local
+              storage, so it is remembered on your next visit. It is not sent to
+              us and used for no other purpose. You can clear it at any time in
+              your browser's settings.
+            </p>
+            <p data-locale-content="de" hidden>
+              Ihre gewählte Sprache wird ausschließlich lokal in Ihrem Browser
+              gespeichert, damit sie bei Ihrem nächsten Besuch erhalten bleibt.
+              Sie wird nicht an uns übermittelt und zu keinem anderen Zweck
+              verwendet. Sie können sie jederzeit in den Einstellungen Ihres
+              Browsers löschen.
+            </p>
+            <p data-locale-content="en">
+              This site sets no cookies and uses no analytics or tracking.
+            </p>
+            <p data-locale-content="de" hidden>
+              Diese Website setzt keine Cookies ein und verwendet keine
+              Analyse- oder Trackingdienste.
+            </p>
+            <p data-locale-content="en">
+              This is based on our legitimate interest in operating the site and
+              serving the content you request (Art. 6(1)(f) GDPR). Questions
+              about this or your rights:
+              <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.
+            </p>
+            <p data-locale-content="de" hidden>
+              Rechtsgrundlage ist unser berechtigtes Interesse am Betrieb der
+              Website und der Bereitstellung der von Ihnen angeforderten Inhalte
+              (Art. 6 Abs. 1 lit. f DSGVO). Fragen dazu oder zu Ihren Rechten:
+              <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.
+            </p>
+          </div>
+        </details>
       </footer>
     </main>
 
