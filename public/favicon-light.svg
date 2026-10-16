@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>HP</title>
+  <rect width="64" height="64" rx="14" fill="#f4f5f7"/>
+  <path d="M15 18V46M15 32H33M33 46V18H43C56 18 56 32 43 32H33"
+    fill="none" stroke="#1d4ed8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
