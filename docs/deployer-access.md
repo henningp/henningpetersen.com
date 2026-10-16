@@ -1,59 +1,105 @@
-# `henning-deploy` — AWS access for terraforming & deploying
+# AWS access for Terraform and deployments
 
-## Where this lives
+## Ownership
 
-The IAM **user `henning-deploy`** and its **`SitePolicy`** are created and kept in
-the **AWS Console** (attached in IAM, not applied by Terraform). This repo holds an
-**exact, durable copy** of the active policy at
-[`infra/deployer-policy.json`](/infra/deployer-policy.json), and `infra/iam.tf`
-references that file so the module mirrors the live policy.
+Use one scoped IAM user, **`henning-deploy`**, for both infrastructure maintenance
+and content deployments. Manage the user, access keys, `SitePolicy`, and its
+attachment manually in IAM using a separate administrative identity.
 
-> Why not apply it? IAM was provisioned by hand in the console and is *not* in the
-> Terraform state. Applying the `aws_iam_policy`/`aws_iam_user` resources here would
-> try to create a **second** policy of the same name. Treat `iam.tf` as documentation
-> of intent until/unless the resources are `terraform import`-ed.
+Terraform manages S3, CloudFront, ACM, and Route 53, including the S3 bucket policy
+that lets CloudFront read the site. It does **not** manage the deployer's IAM
+identity or permissions. The deployer does not need IAM administration, policy
+read access, or permission to change its own access.
 
-## What the policy grants
+`infra/iam.tf` was removed after checking that none of its three IAM resources
+were in Terraform state. No live IAM objects were deleted or detached. Do not
+reintroduce IAM resource declarations as documentation: Terraform executes them.
 
-Seven statements, scoped narrowly to this account (`528099663248`):
+## Named local profile
 
-| # | Service | Scope | Grants |
-|---|---------|-------|--------|
-| 0 | **ACM** | `arn:aws:acm:us-east-1:…:certificate/*` | Read/inspect/tag the CloudFront TLS cert (`Describe`/`Get`/`List*`/`Renew`/`Tag*`) |
-| 1 | **CloudFront** | `arn:aws:cloudfront::528099663248:*` | `Get*`/`Update*`/`Delete*` for the distribution + OAC, plus `CreateInvalidation` (used by `pnpm deploy`) |
-| 2 | **Route 53** | `*` | Manage the hosted zone & record sets (created for the NS cutover); includes `GetChange` to poll async changes |
-| 3 | **S3** | `arn:aws:s3:::henningpetersen-com[/*]` | Read/write the content bucket: `PutObject`, `ListBucket`, `GetBucket*`, encryption/lifecycle config, `DeleteObject`/`DeleteBucket` |
-| 4 | **S3** | `*` | `ListAllMyBuckets` (needed so the CLI can resolve the bucket name) |
-| 5 | **CloudFront** | `…:528099663248:*` | *Create*/`List* for distributions & OACs (first-time provisioning only) |
-| 6 | **ACM** | `…:certificate/*` | `RequestCertificate` / `ListCertificates` (first-time provisioning only) |
+Use **`henning-site`** rather than relying on the unrelated `default` profile:
 
-### Least-privilege notes
-- **S3** statement 3 is bucket-scoped; statement 4 (`ListAllMyBuckets`) is unavoidable
-  for an S3 CLI key that only knows the bucket *name*.
-- **Route 53** uses `"Resource": "*"` — Route 53 does not support per-record resource
-  granularity, so account scope is expected here. It can be tightened to a zone
-  ARN later if needed.
-- `Create*` / `RequestCertificate` / `Delete*` are *first-time provisioning* scopes:
-  they exist so the stack can be built, and are harmless once the resources exist
-  (idempotent Terraform won't call them unless the resource is missing).
-
-## Reconciling with Terraform (optional, later)
-
-If you ever want Terraform to *own* IAM, import the live identities first so it
-adopts them instead of colliding:
-
-```bash
-cd infra
-terraform import aws_iam_user.henning_deploy henning-deploy
-terraform import aws_iam_policy.SitePolicy SitePolicy
-terraform import 'aws_iam_user_policy_attachment.henning_deploy_policy[*]' SitePolicy
-terraform apply
+```sh
+aws configure --profile henning-site
+# Existing henning-deploy access key; region eu-central-1; output json.
+aws sts get-caller-identity --profile henning-site
 ```
 
-Until then, keep any **policy changes in the console** and paste the updated JSON
-back into `infra/deployer-policy.json` to keep the record in sync.
+If the existing key is only saved in `~/.aws/credentials`, copy its values locally
+into the named profile; do not create an extra key just to rename a profile.
+Expected identity: `arn:aws:iam::528099663248:user/henning-deploy`.
+This repository does not create the local profile or edit `~/.aws/`.
 
-## Identity
-- **User:** `henning-deploy` — `arn:aws:iam::528099663248:user/henning-deploy`
-- **Access key:** `REDACTED_AWS_ACCESS_KEY_ID`
-- **Region:** `eu-central-1` (profile `[default]` in `~/.aws/` — not committed)
+Select it for a shell session:
+
+```sh
+export AWS_PROFILE=henning-site
+terraform -chdir=infra plan
+terraform -chdir=infra apply
+pnpm deploy
+```
+
+Alternatively prefix each command with `AWS_PROFILE=henning-site`. Both Terraform
+providers and the deploy script use the normal AWS credential chain; no profile
+name is hardcoded in executable configuration. Environment credentials can take
+precedence over a profile, so unset stale `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, and `AWS_SESSION_TOKEN` variables when switching identities.
+Verify the identity before applying or deploying.
+
+Leave the existing `default` profile alone until the named profile works. Protect
+local credential files, never commit keys, rotate keys periodically, and disable
+unused keys. IAM Identity Center with short-lived credentials is a future upgrade,
+not a requirement for this small site. Protect the separate administrative login
+with MFA; do not use root access keys.
+
+## Reference policy (not applied by Terraform)
+
+[`deployer-policy.json`](deployer-policy.json) is a **proposed reference policy**
+for manual review and installation, not a verified export of the live policy.
+The current deployer cannot read IAM policies, and the live policy has been edited
+manually. Moving this JSON out of `infra/` does not update AWS permissions.
+
+| Scope | Access |
+|-------|--------|
+| S3 bucket `henningpetersen-com` | Terraform bucket configuration and listing |
+| Objects in that bucket | Upload, read, and delete site content |
+| CloudFront distributions and OACs in account `528099663248` | Inspect, update, delete; tag distributions and invalidate caches |
+| ACM certificates in `us-east-1` in that account | Inspect, tag, and delete |
+| Hosted zone `Z0326591QB2H1WSRQHAY` | Inspect, tag, and change DNS records |
+| Route 53 change IDs | Poll asynchronous DNS changes |
+| APIs without resource-level scoping | Create/list CloudFront distributions and OACs; request/list ACM certificates |
+
+This is a pragmatic infrastructure policy, not a content-upload-only policy:
+
+- CloudFront resource-ID wildcards allow replacements without editing IAM for
+  each new ID. They also allow maintenance of other distributions/OACs in this
+  account. Tighten these to exact ARNs if the account hosts other projects.
+- CloudFront create/list and ACM request/list actions require `Resource: "*"`.
+  ACM request/list is restricted to `us-east-1`.
+- S3 `GetBucket*`/`PutBucket*` are intentionally bucket-scoped action wildcards
+  for Terraform maintenance. Object access is a separate statement. The CLI does
+  not need `ListAllMyBuckets` to sync to this explicitly named bucket.
+- DNS permissions cover **all records in this zone**, including mail records.
+  Review every DNS plan carefully. Creating or deleting hosted zones is
+  deliberately excluded; rebuilding the zone needs an administrator and a review
+  of its ARN and registrar delegation.
+- Create/delete permissions are real capabilities, not harmless just because
+  Terraform normally leaves existing resources alone. Review replacement and
+  destroy plans before approving them.
+
+### Updating the live policy manually
+
+1. Sign in with your administrative identity, not the deployer.
+2. Save the current policy/version for rollback. Compare it with the reference;
+   do not assume this file includes every manual change you have made.
+3. Use IAM's policy editor/Access Analyzer validation to review the JSON. Apply
+   the reviewed policy to `SitePolicy` and attach it to `henning-deploy`.
+4. Verify the named profile's identity and run a **full** `terraform plan` (no
+   `-target`). A plan checks refresh permissions, not every possible write action.
+5. Test a normal content deployment when ready. If access is denied, investigate
+   the exact action/resource rather than granting administrator access.
+6. Keep the reference and this document in sync with your intended permissions.
+
+The reference removes the invalid `acm:ListCertificateDomainValidations` action
+(validation information comes from `DescribeCertificate`) and fixes global API
+scopes in the previous JSON. It grants no `iam:*` actions.

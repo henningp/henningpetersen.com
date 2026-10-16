@@ -5,10 +5,11 @@ to email; the visible message links to <https://daenen4.de>.
 
 - **Site:** [Astro](https://astro.build) + TypeScript, fully static → `dist/`
 - **Infra (Terraform, `infra/`):**
-   - S3 bucket in **eu-central-1 (Frankfurt)**, private, versioned, SSE
-   - CloudFront distribution (global, Frankfurt edge for EU visitors) + ACM cert
-- **Deploy:** `pnpm deploy` → build, `aws s3 sync`, CloudFront invalidation
-- **Auth:** a scoped IAM user with a static access key (no SSO) — see below
+  - S3 bucket in **eu-central-1 (Frankfurt)**, private, versioned, SSE
+  - CloudFront distribution (global, Frankfurt edge for EU visitors) + ACM cert
+  - Route 53 public zone, website records, and Google mail DNS
+- **Deploy:** `AWS_PROFILE=henning-site pnpm deploy` → build, S3 sync, CDN invalidation
+- **Auth:** a manually managed scoped IAM user; named profile `henning-site`
 
 ## Local development
 
@@ -25,66 +26,38 @@ the email/company links, edit `src/config.ts` and `src/pages/index.astro`.
 
 ## One-time AWS setup
 
-This uses **one scoped IAM user** (`henning-deploy`) with a static access key.
-It holds no `*` wildcards except where CloudFront requires it
-(`Resource: "arn:aws:cloudfront::<account>:*"` — CloudFront does not permit
-per-distribution ARN-based restrictions at apply time).
+### 1. Manually managed IAM access
 
-### 1. IAM user `henning-deploy`
+Use one scoped IAM user (`henning-deploy`) for Terraform and content deployment.
+Manage its access keys, `SitePolicy`, and policy attachment manually in IAM with
+an administrative login. **This Terraform stack does not manage deployer IAM.**
+It still manages the application bucket policy granting CloudFront read access.
 
-Create the user, add a single access key, and copy both into
-`~/.aws/credentials` (profile `default`):
+See [AWS access](docs/deployer-access.md) for setup, scope, and maintenance.
+[The reference policy](docs/deployer-policy.json) is for manual review; Terraform
+does not apply it, and it is not a verified snapshot of live permissions.
+
+### 2. Named AWS profile
+
+Configure the existing deployer credentials locally (never commit them):
 
 ```sh
-aws iam create-user henning-deploy
-aws iam create-access-key --user-name henning-deploy   # save the secret
+aws configure --profile henning-site  # region eu-central-1; output json
+export AWS_PROFILE=henning-site
+aws sts get-caller-identity
 ```
 
-~/.aws/credentials
-
-```ini
-[default]
-aws_access_key_id = AKIA...
-aws_secret_access_key = ...
-```
-
-~/.aws/config
-
-```ini
-[default]
-region = eu-central-1
-output = json
-```
-
-### 2. Scoped policy (single inline policy on `henning-deploy`)
-
-| Statement   | Scope                                                        | Purpose                        |
-|-------------|--------------------------------------------------------------|--------------------------------|
-| `SiteBucket`| `arn:aws:s3:::henningpetersen-com(/*)` + `s3:ListAllMyBuckets` | S3 write + Terraform reads  |
-| `SiteCloudFront`| `arn:aws:cloudfront::<account>:*`                      | Create/read/invalidate CDN     |
-| `SiteAcm`   | `arn:aws:acm:us-east-1:<account>:certificate/*`           | Issue + validate cert          |
-
-`SiteBucket` needs several S3 read actions that do **not** fall under the
-`GetBucket*` / `PutBucket*` prefixes and were added one pair at a time as the
-Terraform refresh path demanded them:
-
-- `s3:Get/PutAccelerateConfiguration`
-- `s3:Get/PutEncryptionConfiguration`
-- `s3:Get/PutLifecycleConfiguration`
-- `s3:Get/PutReplicationConfiguration`
-
-Along with the standard set:
-`CreateBucket, DeleteBucket, GetBucket*, PutBucket*, ListBucket,
-GetObject, PutObject, DeleteObject, ListAllMyBuckets`.
-
-`SiteCloudFront` also needs the tag action used by
-`CreateDistributionWithTags`: `cloudfront:TagResource`.
+The expected user is `arn:aws:iam::528099663248:user/henning-deploy`. Profile
+selection stays outside the Terraform providers and deployment script. The
+existing `default` profile is not changed by this repository.
 
 ### 3. Apply Terraform
 
 ```sh
+export AWS_PROFILE=henning-site
 cd infra
 terraform init
+terraform plan
 terraform apply
 ```
 
@@ -98,22 +71,20 @@ Outputs you need at your DNS provider:
 - `distribution_domain` — the CloudFront domain, e.g.
   `d12ab3c4d5e6f7.cloudfront.net`.
 
-### 4. DNS (at Host Europe, where the MX records already live)
+### 4. DNS (Route 53)
 
-Host Europe only allows CNAME on subdomains, so the apex is handled by a
-provider-specific 301 redirect rather than a record:
+`infra/route53.tf` manages the public zone: apex A/AAAA aliases to CloudFront,
+the `www` CNAME, and Google mail records. Host Europe is the previous DNS host,
+not the place to edit the current records. The registrar's NS delegation must
+match `terraform output route53_name_servers`.
 
-- `www.henningpetersen.com` → **CNAME** → `<distribution_domain>`
-- `henningpetersen.com` (apex) → **301 redirect** → `https://www.henningpetersen.com`
-- **Do not touch** the existing MX / SPF / DMARC records.
-
-If your zone is managed elsewhere, both apex and www can go straight to
-`<distribution_domain>` as CNAMEs.
+**Do not change MX / SPF / DMARC records as part of website or IAM maintenance.**
+Review DNS changes carefully because this domain is used for email.
 
 ## Deploy
 
 ```sh
-pnpm deploy
+AWS_PROFILE=henning-site pnpm deploy
 ```
 
 That builds the site, syncs `dist/` to S3 (`--delete`, versioned), and

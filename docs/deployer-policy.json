@@ -2,54 +2,66 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "VisualEditor0",
+      "Sid": "SiteCertificates",
       "Effect": "Allow",
       "Action": [
         "acm:DescribeCertificate",
         "acm:RemoveTagsFromCertificate",
         "acm:GetCertificate",
         "acm:AddTagsToCertificate",
-        "acm:ListCertificateDomainValidations",
-        "acm:RenewCertificate",
-        "acm:ListTagsForCertificate"
+        "acm:ListTagsForCertificate",
+        "acm:DeleteCertificate"
       ],
       "Resource": "arn:aws:acm:us-east-1:528099663248:certificate/*"
     },
     {
-      "Sid": "VisualEditor1",
+      "Sid": "SiteDistributions",
       "Effect": "Allow",
       "Action": [
         "cloudfront:GetDistribution",
-        "cloudfront:DeleteOriginAccessControl",
+        "cloudfront:GetDistributionConfig",
         "cloudfront:ListTagsForResource",
-        "cloudfront:GetOriginAccessControl",
         "cloudfront:TagResource",
+        "cloudfront:UntagResource",
         "cloudfront:ListInvalidations",
-        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:UpdateDistribution",
         "cloudfront:GetInvalidation",
         "cloudfront:DeleteDistribution",
         "cloudfront:CreateInvalidation"
       ],
-      "Resource": "arn:aws:cloudfront::528099663248:*"
+      "Resource": "arn:aws:cloudfront::528099663248:distribution/*"
     },
     {
-      "Sid": "VisualEditor2",
+      "Sid": "SiteOriginAccessControls",
       "Effect": "Allow",
       "Action": [
-        "route53:CreateHostedZone",
-        "route53:GetHostedZone",
-        "route53:ListHostedZones",
-        "route53:ChangeResourceRecordSets",
-        "route53:ListResourceRecordSets",
-        "route53:DeleteHostedZone",
-        "route53:ListTagsForResource",
-        "route53:ChangeTagsForResource",
-        "route53:GetChange"
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:GetOriginAccessControlConfig",
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl"
       ],
-      "Resource": "*"
+      "Resource": "arn:aws:cloudfront::528099663248:origin-access-control/*"
     },
     {
-      "Sid": "VisualEditor3",
+      "Sid": "SiteHostedZone",
+      "Effect": "Allow",
+      "Action": [
+        "route53:GetHostedZone",
+        "route53:ChangeResourceRecordSets",
+        "route53:ListResourceRecordSets",
+        "route53:ListTagsForResource",
+        "route53:ChangeTagsForResource"
+      ],
+      "Resource": "arn:aws:route53:::hostedzone/Z0326591QB2H1WSRQHAY"
+    },
+    {
+      "Sid": "PollDnsChanges",
+      "Effect": "Allow",
+      "Action": "route53:GetChange",
+      "Resource": "arn:aws:route53:::change/*"
+    },
+    {
+      "Sid": "SiteBucket",
       "Effect": "Allow",
       "Action": [
         "s3:GetLifecycleConfiguration",
@@ -60,28 +72,27 @@
         "s3:GetAccelerateConfiguration",
         "s3:GetReplicationConfiguration",
         "s3:PutEncryptionConfiguration",
-        "s3:PutObject",
         "s3:PutBucket*",
-        "s3:GetObject",
+        "s3:DeleteBucketPolicy",
         "s3:GetEncryptionConfiguration",
         "s3:PutLifecycleConfiguration",
         "s3:GetBucket*",
-        "s3:DeleteObject",
         "s3:DeleteBucket"
       ],
-      "Resource": [
-        "arn:aws:s3:::henningpetersen-com",
-        "arn:aws:s3:::henningpetersen-com/*"
-      ]
+      "Resource": "arn:aws:s3:::henningpetersen-com"
     },
     {
-      "Sid": "VisualEditor4",
+      "Sid": "SiteObjects",
       "Effect": "Allow",
-      "Action": "s3:ListAllMyBuckets",
-      "Resource": "*"
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::henningpetersen-com/*"
     },
     {
-      "Sid": "VisualEditor5",
+      "Sid": "CreateAndListCloudFrontResources",
       "Effect": "Allow",
       "Action": [
         "cloudfront:CreateOriginAccessControl",
@@ -89,16 +100,21 @@
         "cloudfront:ListDistributions",
         "cloudfront:CreateDistribution"
       ],
-      "Resource": "arn:aws:cloudfront::528099663248:*"
+      "Resource": "*"
     },
     {
-      "Sid": "VisualEditor6",
+      "Sid": "RequestAndListCertificates",
       "Effect": "Allow",
       "Action": [
         "acm:RequestCertificate",
         "acm:ListCertificates"
       ],
-      "Resource": "arn:aws:acm:us-east-1:528099663248:certificate/*"
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "us-east-1"
+        }
+      }
     }
   ]
 }

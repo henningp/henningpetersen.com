@@ -115,3 +115,16 @@ resource "aws_route53_record" "dmarc" {
     "v=DMARC1; p=quarantine; pct=100; rua=mailto:hp@henningpetersen.com",
   ]
 }
+# Google DKIM: one TXT record containing two ordered character-strings.
+# Each chunk must be <=255 bytes. Keep both quoted chunks in ONE records entry;
+# separate entries create independent TXT records, which DKIM does not join.
+resource "aws_route53_record" "dkim_google" {
+  zone_id         = aws_route53_zone.site.id
+  name            = "google._domainkey.${var.domain}"
+  type            = "TXT"
+  allow_overwrite = true
+  ttl             = 300
+  records = [
+    "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtTDveBefC7aG8D2sJQRLSWN1duIiWYQnkWhr7KHWzzQYdSQQaNFvjSqgAuzdhznubwQ0kA1FWx3gdUI6UD3YmLfGfFGb4/WlmMiTbgcgvBg9klDdiqQHDXPU+rU9b/B5ozTUNFLGF8nZbGQnvmFXJFWQ4pEZ8RFaHpMJI6nfbXOUaVhbpc27OCTwSSlsHrSdn\"\"+l+HIuN0droxmQSJJAnwyQUG/oxHgX3I5yG51UmfFJG0YASnmjcrpqUwJXGf3lB+FXK5a4qFSrQpcLcNwuUhZbDwP+KtkEqXubukDs+hx0eyhcOvCGdcVvS0iSQZs4fCeFaVe8N0n/WzzD4o9zDiQIDAQAB",
+  ]
+}

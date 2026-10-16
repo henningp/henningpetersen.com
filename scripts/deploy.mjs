@@ -5,12 +5,13 @@
  *   2. Upload to S3          (aws s3 sync --delete, versioned)
  *   3. Invalidate CloudFront (aws cloudfront create-invalidation)
  *
- * Credentials come from the default AWS CLI profile (~/.aws).
+ * Credentials use the standard AWS CLI credential chain. Select the site's
+ * named profile with AWS_PROFILE=henning-site (see docs/deployer-access.md).
  * Bucket + distribution are read from the Terraform outputs in infra/
  * (keys `bucket_name` / `distribution_id`), unless overridden by env vars
  * BUCKET / DISTRIBUTION_ID — handy before the first `terraform apply`.
  *
- * Usage: pnpm deploy
+ * Usage: AWS_PROFILE=henning-site pnpm deploy
  */
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
