@@ -195,10 +195,7 @@ import { SITE } from "../config";
                 String(btn.getAttribute("data-choose-locale") === loc),
               );
             });
-          document.title =
-            loc === "de"
-              ? "Henning Petersen – E-Mail"
-              : "Henning Petersen";
+          document.title = "Henning Petersen";
 
         // Show the time-of-day greeting for the active locale.
         document.querySelectorAll(".greeting").forEach(function (g) {
