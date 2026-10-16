@@ -7,7 +7,9 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "node ./scripts/deploy.mjs"
+    "deploy": "node ./scripts/deploy.mjs",
+    "build:background": "python3 scripts/build-background.py",
+    "test": "node --test tests/background.test.mjs && python3 -m unittest discover -s services/background -p 'test_*.py'"
   },
   "dependencies": {
     "astro": "^6.1.0"

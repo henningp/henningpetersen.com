@@ -1,0 +1,39 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadIncomingPhotos",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::henningpetersen-com-media/incoming/*"
+    },
+    {
+      "Sid": "ListMediaBucket",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::henningpetersen-com-media"
+    },
+    {
+      "Sid": "ReadAndPublishBackgrounds",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::henningpetersen-com-media/photos/*",
+        "arn:aws:s3:::henningpetersen-com-media/background.json",
+        "arn:aws:s3:::henningpetersen-com-media/state/*"
+      ]
+    },
+    {
+      "Sid": "WriteFunctionLogs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:eu-central-1:528099663248:log-group:/aws/lambda/henningpetersen-background-sync:log-stream:*"
+    }
+  ]
+}

@@ -7,3 +7,5 @@ infra/*.tfvars
 .DS_Store
 .idea
 *.log
+.artifacts/
+__pycache__/

@@ -8,6 +8,7 @@ to email; the visible message links to <https://daenen4.de>.
   - S3 bucket in **eu-central-1 (Frankfurt)**, private, versioned, SSE
   - CloudFront distribution (global, Frankfurt edge for EU visitors) + ACM cert
   - Route 53 public zone, website records, and Google mail DNS
+  - Separate media bucket + daily Lambda/Scheduler for shared background photos
 - **Deploy:** `AWS_PROFILE=henning-site pnpm deploy` → build, S3 sync, CDN invalidation
 - **Auth:** a manually managed scoped IAM user; named profile `henning-site`
 
@@ -53,7 +54,12 @@ existing `default` profile is not changed by this repository.
 
 ### 3. Apply Terraform
 
+First complete the [background IAM setup](docs/background-iam/README.md), including
+updating the Lambda role if it was originally created for Flickr. Build its Linux
+deployment ZIP before planning:
+
 ```sh
+pnpm build:background
 export AWS_PROFILE=henning-site
 cd infra
 terraform init
@@ -89,10 +95,23 @@ AWS_PROFILE=henning-site pnpm deploy
 
 That builds the site, syncs `dist/` to S3 (`--delete`, versioned), and
 invalidates the CloudFront cache. Fresh content is usually live within ~2
-minutes. Repeat any time — no other moving parts.
+minutes. Repeat any time. This deploy only changes the static site, not the
+separate photo pool or Lambda code.
+
+## Daily background photos
+
+Upload JPEG/PNG/WebP/TIFF candidates into `incoming/` in the private media bucket.
+The daily Lambda processes them and publishes one shared background at 03:00 UTC.
+Photos are shown in both light and dark themes, with a solid-color fallback.
+
+See [background setup and operation](docs/backgrounds.md) for deployment, supported
+formats and limits, manual invocation, tests, and removal/failure behavior. A
+friendlier uploader is intentionally deferred; for now use the S3 console with an
+administrator or separately authorized upload identity.
 
 ## Cost (at near-zero traffic)
 
-Effectively **$0 / month**: S3 storage + requests are inside the free tier,
-CloudFront's first 1M requests and 100 GB transfer per month are free, and the
-ACM certificate is free. Expect a few cents once traffic becomes noticeable.
+Expected to be small: S3, CloudFront, Lambda, Scheduler, and processing logs are
+usage-based. Free-tier eligibility depends on the account and current AWS plans;
+no zero-cost guarantee is assumed. The ACM certificate has no additional charge
+when used with CloudFront.

@@ -28,6 +28,10 @@ import { SITE } from "../config";
     </script>
   </head>
   <body>
+    <div class="background" aria-hidden="true">
+      <img id="background-photo" alt="" decoding="async" />
+      <div class="background-scrim"></div>
+    </div>
     <header>
       <nav aria-label="Language" class="lang-toggle">
         <button type="button" data-choose-locale="en" aria-pressed="false">EN</button>
@@ -114,6 +118,14 @@ import { SITE } from "../config";
               unser Hoster AWS ist ein Auftragsverarbeiter gemäß Art. 28 DSGVO.
             </p>
             <p data-locale-content="en">
+              The rotating background photographs are delivered through the same
+              hosting provider, without requests to external photo services.
+            </p>
+            <p data-locale-content="de" hidden>
+              Die wechselnden Hintergrundfotos werden über denselben Hoster
+              ausgeliefert, ohne Anfragen an externe Fotodienste.
+            </p>
+            <p data-locale-content="en">
               Your chosen language is stored only in your browser's local
               storage, so it is remembered on your next visit. It is not sent to
               us and used for no other purpose. You can clear it at any time in
@@ -152,6 +164,19 @@ import { SITE } from "../config";
 
     <script>
       import { pickGreeting } from "../config";
+      import { createBackgroundUpdater } from "../background";
+
+      const background = document.querySelector<HTMLImageElement>("#background-photo");
+      if (background) {
+        const updateBackground = createBackgroundUpdater(background);
+        void updateBackground();
+        setInterval(() => {
+          if (document.visibilityState === "visible") void updateBackground();
+        }, 300000);
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") void updateBackground();
+        });
+      }
 
       (function () {
         var html = document.documentElement;
@@ -205,6 +230,7 @@ import { SITE } from "../config";
     <style>
       :root {
         --bg: #f4f5f7;
+        --photo-overlay: rgb(244 245 247 / 50%);
         --card: #ffffff;
         --text: #1a1d23;
         --muted: #5c6370;
@@ -217,6 +243,7 @@ import { SITE } from "../config";
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #101216;
+          --photo-overlay: rgb(16 18 22 / 50%);
           --card: #181b21;
           --text: #e7e9ee;
           --muted: #9aa1ad;
@@ -252,10 +279,46 @@ import { SITE } from "../config";
         min-height: 100dvh;
         display: flex;
         flex-direction: column;
+        isolation: isolate;
+      }
+
+      .background {
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+      }
+      .background img,
+      .background-scrim {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .background img {
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 300ms ease;
+      }
+      .background img.is-loaded {
+        opacity: 1;
+      }
+      .background-scrim {
+        background: var(--photo-overlay);
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .background img {
+          transition: none;
+        }
       }
 
       header {
         padding: 1rem 1.5rem 0;
+      }
+      /* Text outside the solid card needs full contrast over the photo. */
+      .lang-toggle,
+      footer {
+        --muted: var(--text);
       }
       .lang-toggle {
         display: inline-flex;

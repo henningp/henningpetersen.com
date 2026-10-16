@@ -8,6 +8,13 @@ resource "aws_cloudfront_origin_access_control" "site" {
   signing_protocol                  = "sigv4"
 }
 
+resource "aws_cloudfront_origin_access_control" "media" {
+  name                              = "${var.media_bucket_name}-oac"
+  origin_access_control_origin_type = "s3"
+  signing_behavior                  = "always"
+  signing_protocol                  = "sigv4"
+}
+
 # Wildcard-ish cert for apex + www. CloudFront mandates us-east-1.
 # AWS provider v6 no longer waits for validation during apply — add the
 # CNAMEs from `terraform output certificate_validation` at your DNS provider,
@@ -30,6 +37,48 @@ resource "aws_cloudfront_distribution" "site" {
     domain_name              = aws_s3_bucket.site.bucket_regional_domain_name
     origin_id                = "s3-${var.bucket_name}"
     origin_access_control_id = aws_cloudfront_origin_access_control.site.id
+  }
+
+  origin {
+    domain_name              = aws_s3_bucket.media.bucket_regional_domain_name
+    origin_id                = "s3-${var.media_bucket_name}"
+    origin_access_control_id = aws_cloudfront_origin_access_control.media.id
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "background.json"
+    target_origin_id       = "s3-${var.media_bucket_name}"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = true
+    min_ttl                = 0
+    default_ttl            = 300
+    max_ttl                = 300
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
+  }
+
+  ordered_cache_behavior {
+    path_pattern           = "photos/*"
+    target_origin_id       = "s3-${var.media_bucket_name}"
+    viewer_protocol_policy = "redirect-to-https"
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    compress               = false
+    min_ttl                = 0
+    default_ttl            = 31536000
+    max_ttl                = 31536000
+    forwarded_values {
+      query_string = false
+      cookies {
+        forward = "none"
+      }
+    }
   }
 
   default_cache_behavior {

@@ -7,6 +7,16 @@ output "bucket_arn" {
   value = aws_s3_bucket.site.arn
 }
 
+output "media_bucket_name" {
+  description = "Upload background candidates to incoming/ in this private bucket"
+  value       = aws_s3_bucket.media.bucket
+}
+
+output "background_function_name" {
+  description = "Invoke manually after uploads to process them before the next scheduled run"
+  value       = aws_lambda_function.background.function_name
+}
+
 output "distribution_id" {
   description = "CloudFront distribution ID (needed for invalidations)"
   value       = aws_cloudfront_distribution.site.id

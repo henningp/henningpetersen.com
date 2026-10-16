@@ -9,7 +9,9 @@ attachment manually in IAM using a separate administrative identity.
 Terraform manages S3, CloudFront, ACM, and Route 53, including the S3 bucket policy
 that lets CloudFront read the site. It does **not** manage the deployer's IAM
 identity or permissions. The deployer does not need IAM administration, policy
-read access, or permission to change its own access.
+read access, or permission to change its own access. The proposed background-sync
+extension adds read/pass access to two specific execution roles, not IAM
+administration; see [Background sync IAM bootstrap](background-iam/README.md).
 
 `infra/iam.tf` was removed after checking that none of its three IAM resources
 were in Terraform state. No live IAM objects were deleted or detached. Do not
@@ -103,3 +105,28 @@ This is a pragmatic infrastructure policy, not a content-upload-only policy:
 The reference removes the invalid `acm:ListCertificateDomainValidations` action
 (validation information comes from `DescribeCertificate`) and fixes global API
 scopes in the previous JSON. It grants no `iam:*` actions.
+
+## S3 background-sync extension
+
+For the existing single managed policy named **`s3-deploy`**, use
+[`s3-deploy-policy.json`](s3-deploy-policy.json). It is the exact union of the
+hosting reference above and the background deployer reference below. Install it
+as the default version of `s3-deploy`, retaining a previous version for rollback.
+Do not replace the hosting permissions with the background-only file. This
+combined policy is an alternative to attaching two separate deployer policies;
+the Lambda and Scheduler runtime policies still belong on their respective roles,
+not on the deployment user. When changing either source reference, update and
+recheck the combined file against IAM's managed-policy size limit.
+
+[Background sync IAM bootstrap](background-iam/README.md) contains a separate,
+additive deployer policy and the trust/runtime policies for two administrator-
+managed execution roles. No Flickr key or SSM parameter is needed. These are
+reference files only: they do not alter AWS, replace `SitePolicy`, or add
+executable IAM declarations to Terraform.
+
+The extension grants `iam:GetRole` and service-restricted `iam:PassRole` on only
+those two roles. The existing deployer policy above remains unchanged.
+Terraform should manage the media bucket, Lambda, Scheduler group/schedule, and
+log group, but not these roles or their policies. If the roles were created for
+the previous Flickr design, update the Lambda inline policy using the bootstrap
+instructions before deploying.

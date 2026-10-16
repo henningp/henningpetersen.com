@@ -18,3 +18,9 @@ variable "tags" {
     ManagedBy = "terraform"
   }
 }
+
+variable "media_bucket_name" {
+  description = "Separate S3 bucket for private uploads and published backgrounds (also update manual IAM policies if changed)"
+  type        = string
+  default     = "henningpetersen-com-media"
+}
