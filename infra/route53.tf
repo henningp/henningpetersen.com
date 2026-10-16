@@ -93,6 +93,7 @@ resource "aws_route53_record" "txt_apex" {
   ttl             = 300
   records = [
     "google-site-verification=BoQs6QNzSt3DivwKSiX_Dyaw21QWYms4Tct2JI7e0y0",
+    "google-site-verification=CWm99Xtz1tXM6zXDFKeOMR5C7mmtQXf4K_4hNqbxQuY",
     "v=spf1 include:_spf.google.com -all",
   ]
 }
