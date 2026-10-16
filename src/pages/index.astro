@@ -73,9 +73,6 @@ import { SITE } from "../config";
       </section>
 
       <footer>
-        <p>
-          <a href={`mailto:${SITE.email}`}>{SITE.email}</a>
-        </p>
         <details class="imprint">
           <summary>
             <span data-locale-content="en">Legal notice</span>
@@ -239,6 +236,7 @@ import { SITE } from "../config";
         --accent-contrast: #ffffff;
         --btn-text: #1a1d23;
         --btn-border: #cfd4dc;
+        --footer-underline: color-mix(in srgb, var(--text) 25%, transparent);
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -252,6 +250,7 @@ import { SITE } from "../config";
           --accent-contrast: #0b0d12;
           --btn-text: #e7e9ee;
           --btn-border: #3a3f4a;
+          --footer-underline: var(--border);
         }
       }
 
@@ -446,7 +445,7 @@ import { SITE } from "../config";
       footer a {
         color: var(--muted);
         text-decoration: none;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--footer-underline);
       }
       footer a:hover {
         color: var(--text);
@@ -460,7 +459,7 @@ import { SITE } from "../config";
         cursor: pointer;
         color: var(--muted);
         text-decoration: none;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--footer-underline);
         list-style: none;
       }
       footer .imprint > summary::-webkit-details-marker {
