@@ -130,3 +130,13 @@ Terraform should manage the media bucket, Lambda, Scheduler group/schedule, and
 log group, but not these roles or their policies. If the roles were created for
 the previous Flickr design, update the Lambda inline policy using the bootstrap
 instructions before deploying.
+
+## Personal Shortcut upload extension
+
+[Upload IAM bootstrap](upload-iam/README.md) adds a third, manually managed Lambda
+execution role and a **separate** `BackgroundUploadInfrastructurePolicy` attached
+to `henning-deploy`. Keep `s3-deploy` and the existing runtime roles unchanged.
+Do not append the new permissions to the already-large combined policy. The
+upload role can read only the personal token's SHA-256 hash from SSM, sign writes
+only under `incoming/shortcut/*`, and write its logs. The deployer does not create
+the role or read/write the hash. No raw token is stored in AWS or Terraform.

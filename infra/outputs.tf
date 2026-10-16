@@ -17,6 +17,11 @@ output "background_function_name" {
   value       = aws_lambda_function.background.function_name
 }
 
+output "background_upload_url" {
+  description = "Personal Shortcut endpoint; authorization token is configured outside Terraform"
+  value       = "${aws_apigatewayv2_api.background_upload.api_endpoint}/uploads"
+}
+
 output "distribution_id" {
   description = "CloudFront distribution ID (needed for invalidations)"
   value       = aws_cloudfront_distribution.site.id

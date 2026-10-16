@@ -2,7 +2,7 @@
 
 Background candidates live in a separate private S3 bucket,
 `henningpetersen-com-media`, in Frankfurt. No Flickr/API key, Mac job, or
-request-time backend is involved. The site bucket and its `sync --delete`
+public-page request-time backend is involved. The site bucket and its `sync --delete`
 deployment stay unchanged.
 
 ## Flow
@@ -34,8 +34,10 @@ deployment stay unchanged.
 
 Prerequisites: Node.js 22.18+ (for TypeScript test execution), pnpm, Python 3.10+
 for packaging/tests, Terraform, AWS CLI v2, and the administrator-created roles
-and policy from [IAM bootstrap](background-iam/README.md). The Lambda package
-targets **Python 3.13, Linux x86-64** regardless of the build computer's platform.
+and policy from [IAM bootstrap](background-iam/README.md), plus the additional
+[upload prerequisites](upload-iam/README.md) for the full stack. The image-processing
+package targets **Python 3.13, Linux x86-64** regardless of the build computer's
+platform.
 
 **If the Lambda role was created for Flickr, update its inline policy first**
 using step 3 of the bootstrap instructions. The new code needs `incoming/*` reads
@@ -47,6 +49,7 @@ From the repository root:
 pnpm install
 pnpm test
 pnpm build:background
+pnpm build:upload
 pnpm build
 AWS_PROFILE=henning-site terraform -chdir=infra validate
 AWS_PROFILE=henning-site terraform -chdir=infra plan
@@ -76,7 +79,12 @@ The first empty run is harmless: the page uses its solid background until you
 upload images and the first selection is published. Terraform does not create
 or overwrite `background.json`, inventories, or images.
 
-## Uploading photos for now
+## Uploading photos
+
+[Apple Shortcut upload](shortcut-upload.md) adds personal, token-authenticated
+uploads from the iPhone/iPad sharing dialog, synced privately from the Mac via
+iCloud. It needs its own [IAM bootstrap](upload-iam/README.md) and endpoint
+deployment. The manual alternative below remains available.
 
 Use an administrator or an identity separately authorized to upload media. The
 `henning-site` deployer intentionally has no direct media-object permissions.
@@ -112,7 +120,7 @@ replace an already eligible same-day choice. View
 If the initial missing pointer was cached as a 403, CloudFront's default error
 cache can briefly delay the first publication too.
 
-No uploader script/UI is included yet. Only upload photos you are comfortable
+No gallery or deletion UI is included yet. Only upload photos you are comfortable
 making public: generated copies are public even though originals remain private.
 
 ## Edits, removals, and failure behavior

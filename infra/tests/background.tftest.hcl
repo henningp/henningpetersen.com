@@ -1,6 +1,12 @@
 # Entirely mocked: no AWS credentials, API requests, or live state are used.
 mock_provider "aws" {
   override_data {
+    target = data.aws_iam_role.background_upload
+    values = {
+      arn = "arn:aws:iam::528099663248:role/henningpetersen-background-upload"
+    }
+  }
+  override_data {
     target = data.aws_iam_role.background_lambda
     values = {
       arn = "arn:aws:iam::528099663248:role/henningpetersen-background-lambda"
@@ -29,7 +35,14 @@ mock_provider "aws" {
   alias = "eu"
   mock_resource "aws_lambda_function" {
     defaults = {
-      arn = "arn:aws:lambda:eu-central-1:528099663248:function:henningpetersen-background-sync"
+      arn        = "arn:aws:lambda:eu-central-1:528099663248:function:henningpetersen-background-sync"
+      invoke_arn = "arn:aws:apigateway:eu-central-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-central-1:528099663248:function:henningpetersen-background-sync/invocations"
+    }
+  }
+  mock_resource "aws_apigatewayv2_api" {
+    defaults = {
+      execution_arn = "arn:aws:execute-api:eu-central-1:528099663248:testapi"
+      api_endpoint  = "https://testapi.execute-api.eu-central-1.amazonaws.com"
     }
   }
 }

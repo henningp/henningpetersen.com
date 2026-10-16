@@ -55,11 +55,13 @@ existing `default` profile is not changed by this repository.
 ### 3. Apply Terraform
 
 First complete the [background IAM setup](docs/background-iam/README.md), including
-updating the Lambda role if it was originally created for Flickr. Build its Linux
-deployment ZIP before planning:
+updating the Lambda role if it was originally created for Flickr, and the
+[upload IAM setup](docs/upload-iam/README.md). Build both Lambda ZIPs before
+planning:
 
 ```sh
 pnpm build:background
+pnpm build:upload
 export AWS_PROFILE=henning-site
 cd infra
 terraform init
@@ -105,9 +107,13 @@ The daily Lambda processes them and publishes one shared background at 03:00 UTC
 Photos are shown in both light and dark themes, with a solid-color fallback.
 
 See [background setup and operation](docs/backgrounds.md) for deployment, supported
-formats and limits, manual invocation, tests, and removal/failure behavior. A
-friendlier uploader is intentionally deferred; for now use the S3 console with an
-administrator or separately authorized upload identity.
+formats and limits, manual invocation, tests, and removal/failure behavior.
+
+For private iPhone/iPad share-sheet uploads, see [Apple Shortcut setup](docs/shortcut-upload.md)
+and its [additional IAM prerequisites](docs/upload-iam/README.md). The Shortcut is
+created in the Mac app and synced through your own iCloud account; no publishing
+or AWS credentials on devices are needed. The upload endpoint is separate from
+the public website and requires a personal token. Manual S3 uploads still work.
 
 ## Cost (at near-zero traffic)
 

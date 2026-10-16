@@ -1,0 +1,23 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadPersonalUploadTokenHash",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": "arn:aws:ssm:eu-central-1:528099663248:parameter/henningpetersen/backgrounds/upload-token-sha256"
+    },
+    {
+      "Sid": "UploadCandidatesOnly",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::henningpetersen-com-media/incoming/shortcut/*"
+    },
+    {
+      "Sid": "WriteUploadLogs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:eu-central-1:528099663248:log-group:/aws/lambda/henningpetersen-background-upload:log-stream:*"
+    }
+  ]
+}
