@@ -126,6 +126,19 @@ executable IAM declarations to Terraform.
 
 The extension grants `iam:GetRole` and service-restricted `iam:PassRole` on only
 those two roles. The existing deployer policy above remains unchanged.
+It also includes permanent `s3:GetObject` and `s3:PutObject` access to exactly
+`arn:aws:s3:::henningpetersen-com-media/background.json` for manual caption/pointer
+updates. This is the only direct media-object exception: no originals, generated
+photos, private state, object deletion, or bucket-wide object wildcard is included.
+The administrator added this permission manually on 2026-10-24; both the separate
+background reference and combined `s3-deploy` reference include it. As with other
+IAM changes, Terraform does not install it, and these files are not live exports.
+
+If a pointer read/write still returns `AccessDenied`, verify the exact object ARN,
+that the changed policy is attached to `henning-deploy`, and that the intended
+managed-policy version is the default; allow for IAM propagation. Do not broaden
+the scope to the whole media bucket. See [manual caption tests](backgrounds.md#manual-caption-tests).
+
 Terraform should manage the media bucket, Lambda, Scheduler group/schedule, and
 log group, but not these roles or their policies. If the roles were created for
 the previous Flickr design, update the Lambda inline policy using the bootstrap

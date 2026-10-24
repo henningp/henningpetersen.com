@@ -47,7 +47,10 @@ roles, not on the user.
   bucket, function, schedule/group, and logs. It allows `GetRole` and service-
   restricted `PassRole` on just the two execution roles, but no IAM writes or
   direct SSM access. `DescribeLogGroups` requires `Resource: "*"`; it exposes log
-  group metadata across Frankfurt, not other groups' log contents.
+  group metadata across Frankfurt, not other groups' log contents. Permanent
+  `s3:GetObject` / `s3:PutObject` access is also granted on exactly
+  `henningpetersen-com-media/background.json` for manual caption/pointer updates;
+  it does not grant direct access to originals, generated photos, or private state.
 - **Lambda:** can list this media bucket, read `incoming/*`, read/write generated
   photos, `background.json`, and private `state/` objects, and write streams in its
   pre-created log group. Bucket-wide listing also lets S3 distinguish missing
@@ -66,8 +69,10 @@ Likewise, bucket-policy management permits changing who can read the media.
 
 The media bucket uses SSE-S3; no customer-managed KMS key or key permissions are
 needed. Human uploads use an administrator or separately authorized uploader, not
-the Lambda role. The deployer policy intentionally grants no direct media-object
-access and does not provide an S3 console upload workflow.
+the Lambda role. The deployer's only direct media-object access is read/write on
+`background.json`, not deletion, image uploads, or an S3 console upload workflow.
+See [manual caption tests](../backgrounds.md#manual-caption-tests) for conditional
+updates that preserve the current image and avoid overwriting another publisher.
 
 ## Administrator setup
 

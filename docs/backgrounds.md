@@ -121,7 +121,8 @@ iCloud. It needs its own [IAM bootstrap](upload-iam/README.md) and endpoint
 deployment. The manual alternative below remains available.
 
 Use an administrator or an identity separately authorized to upload media. The
-`henning-site` deployer intentionally has no direct media-object permissions.
+`henning-site` deployer's direct media-object permissions cover only read/write
+on `background.json`; they do not allow uploading, reading, or deleting photos.
 
 1. Export selected photos from Apple Photos as **JPEG** (not unmodified HEIC).
    Multi-picture JPEGs (MPO, including some HDR/spatial exports) are supported:
@@ -156,6 +157,66 @@ cache can briefly delay the first publication too.
 
 No gallery or deletion UI is included yet. Only upload photos you are comfortable
 making public: generated copies are public even though originals remain private.
+
+## Manual caption tests
+
+The deployer has permanent `s3:GetObject` / `s3:PutObject` permission on exactly
+`background.json`. This allows a one-off caption test without changing the image,
+source uploads, or private inventory. It is **not** a persistent per-photo edit:
+the next successful processor run restores captions from source metadata (or
+removes the test caption if the source has none). Use the labelled upload workflow
+for permanent captions.
+
+1. Verify `AWS_PROFILE=henning-site aws sts get-caller-identity`. From the repository
+   root, download a backup and note the **ETag** in the command's JSON response:
+
+   ```sh
+   AWS_PROFILE=henning-site aws s3api get-object \
+     --region eu-central-1 \
+     --bucket henningpetersen-com-media --key background.json \
+     .artifacts/caption-before.json
+   ```
+
+2. Make `.artifacts/caption-test.json` from that backup. Keep `src`, `width`,
+   `height`, and `day` unchanged. Set only the approved caption fields and update
+   `updated` to the current UTC ISO timestamp. For example:
+
+   ```json
+   {"label":{"en":"Snow Mountain","de":"Schneekoppe"},"year":2024}
+   ```
+
+   These fields are added to the existing pointer, **not** a replacement document
+   on their own. Check that `day` and `src` still identify the intended photo.
+
+3. Write conditionally, replacing `ETAG_FROM_GET_OBJECT` with the response's ETag
+   (retain its double quotes inside the shell's single quotes):
+
+   ```sh
+   AWS_PROFILE=henning-site aws s3api put-object \
+     --region eu-central-1 \
+     --bucket henningpetersen-com-media --key background.json \
+     --body .artifacts/caption-test.json \
+     --content-type application/json \
+     --cache-control 'public, max-age=0, s-maxage=300, must-revalidate' \
+     --if-match 'ETAG_FROM_GET_OBJECT'
+   ```
+
+   A precondition failure means another publisher won: reread and review the
+   current pointer instead of retrying without the condition. Do not alter private
+   state or grant broader S3 access to work around an access denial.
+
+4. Invalidate `/background.json` using the deployer's existing CloudFront access:
+
+   ```sh
+   AWS_PROFILE=henning-site aws cloudfront create-invalidation \
+     --distribution-id E2IQ8JIGOJ2KUB --paths /background.json
+   ```
+
+   Check the public JSON and reload the website to test both EN/DE labels. Existing
+   open tabs may still wait until their next five-minute refresh. To restore the
+   backup manually, first read the current ETag and verify the image/day are still
+   the intended ones, then use another conditional write; do not blindly overwrite
+   a newer daily selection.
 
 ## Edits, removals, and failure behavior
 

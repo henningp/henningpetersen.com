@@ -138,6 +138,15 @@
       "Resource": "arn:aws:s3:::henningpetersen-com-media"
     },
     {
+      "Sid": "ManageBackgroundPointer",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": "arn:aws:s3:::henningpetersen-com-media/background.json"
+    },
+    {
       "Sid": "BackgroundFunction",
       "Effect": "Allow",
       "Action": [
