@@ -5,6 +5,21 @@ iCloud. No publishing, signed `.shortcut` download, AWS keys on devices, gallery
 or deletion interface is needed. The Shortcut contains a **personal upload token**;
 don't export/share the configured Shortcut with others.
 
+## Supported photo-selection paths
+
+- **One photo:** share it from Photos, or use the picker inside the Shortcut.
+- **Multiple photos:** launch the Shortcut directly and use **Select Photos**
+  (**Fotos auswählen**) with multiple selection enabled.
+
+During manual testing on 2026-10-24, sharing multiple photos from Photos on iPad
+produced mismatched previews and location metadata. Selecting the same photos
+inside the Shortcut kept previews and metadata aligned on both iPad and Mac.
+Bypassing the share-input **Get Images from Input** conversion did not resolve
+the multi-photo share-sheet mismatch. The underlying cause is unconfirmed; do not
+use that path for captioned batches. Correct loop-variable references alone did
+not prevent it. Single-photo sharing and the in-Shortcut picker are the tested
+working alternatives.
+
 ## How it works
 
 ```text
@@ -103,14 +118,15 @@ labels vary with macOS/iOS version and language; names below use English.
 2. Add another **Text** action containing your original token (not its SHA-256
    hash), without spaces or line breaks. **Set Variable** → `Upload Token`.
 3. Add **If → Shortcut Input has any value**. In that branch, run **Get Images
-   from Input** explicitly on `Shortcut Input`, then **Set Variable → Photos**
-   to the extracted Images. Normalizing shared input here is necessary: using
-   the raw share input can leave the loop with zero photos. In **Otherwise**, use
-   **Select Photos**, with **Select Multiple** enabled, then explicitly set
-   `Photos` to the selected photos. Continue after **End If**.
-   If Photos access is unavailable in the Mac picker, test from a Finder Quick
-   Action using exported images; the iPhone/iPad share-sheet path is the primary
-   workflow and does not require a separate export.
+    from Input** explicitly on `Shortcut Input`, then **Set Variable → Photos**
+    to the extracted Images. Use this share-sheet path for **one photo only**;
+    converting the selection does not make captioned batch sharing reliable.
+    In **Otherwise**, use
+    **Select Photos**, with **Select Multiple** enabled, then explicitly set
+    `Photos` to the selected photos. Continue after **End If**.
+    Launch the Shortcut directly to reach this picker for batches. If Photos
+    access is unavailable in the Mac picker, use the iPhone/iPad picker or share
+    one photo at a time; do not fall back to multi-photo sharing for captions.
 4. Set a **Number** `0` as variable `Uploaded Count`.
 5. Add **Repeat with Each** item in `Photos`. All of B–D below go inside this loop.
 
@@ -256,6 +272,8 @@ actual share-sheet input rather than assuming every photo has them.
   send `content_type` and the nested `label`, but only the first adds `year`.
   In each branch, set `Authorization Response` to that request's output, then
   continue with C's existing response extraction after **End If**.
+  Alternatively, set `Authorization Response` to the complete block's **If
+  Result** (**Wenn-Ergebnis**) after **End If**, not to only one branch's output.
 - In D, extract a **tenth Text value**, `x-amz-meta-caption`, from `Form Fields`
   before the upload request. Stop with an error if it is absent: this workflow
   requires the updated endpoint.
@@ -272,6 +290,22 @@ Captions are plain text, not HTML. Labelled re-uploads of identical processed
 images take precedence over old unlabelled copies without increasing their
 selection probability. Existing originals are not automatically deleted.
 
+#### Finish the on-device Shortcut
+
+- Remove only temporary diagnostic Text/Quick Look/Show Result actions and the
+  unconditional test **Stop This Shortcut** (**Kurzbefehl stoppen**). Keep the
+  real per-photo preview and the stops used for authorization/upload failures.
+- Keep JPEG **Preserve Metadata off**, the signed `x-amz-meta-caption` form field,
+  and `file` last. Never display the entire signing response during normal use.
+- Clear the year variable at the start of **every** iteration; formatting a known
+  date may set it, but a missing date must not inherit the previous photo's year.
+  The missing-date signing branch omits `year` entirely.
+- Keep a private backup of the working Shortcut. Let iCloud sync the finished
+  copy, and verify that the intended copy is selected in the share sheet.
+- For a batch, open the Shortcut directly and select photos in its picker.
+  Single-photo sharing remains available. Do not re-enable the multi-photo
+  share-sheet path merely because a single-photo test succeeds.
+
 ## Sync privately to iPhone/iPad
 
 1. Enable **Shortcuts in iCloud** on the Mac and each iPhone/iPad, using your own
@@ -280,7 +314,8 @@ selection probability. Existing originals are not automatically deleted.
    Sheet**, accepting **Images**. Set no-input behavior to the photo picker if
    offered. iOS/iPadOS options may not all be exposed in the Mac editor.
 3. In Photos, select an image → **Share → Add website backgrounds**. Use
-   **Edit Actions** to enable/favorite it if necessary.
+   **Edit Actions** to enable/favorite it if necessary. Share only one photo at a
+   time; for batches, launch the Shortcut directly and use its photo picker.
 4. Approve network access to the API's `execute-api.eu-central-1.amazonaws.com`
    host and the S3 bucket's `s3.eu-central-1.amazonaws.com` host when prompted.
    Approve access to selected photos as requested by the picker/workflow.
@@ -298,8 +333,10 @@ Shortcuts actions; **Mac/iPhone/iPad testing remains a manual acceptance step**.
 After deployment, test:
 
 - An unauthenticated request: `401`, no signed upload authorization.
-- One landscape JPEG, one portrait/HEIC photo, a Live Photo, and a multi-selection
-  from the iPhone/iPad share sheet. Check orientation and still-image conversion.
+- One landscape JPEG, one portrait/HEIC photo, and a Live Photo shared individually,
+  plus a multi-selection from the **in-Shortcut picker**. Check orientation and
+  still-image conversion. Multi-photo share-sheet input is not an accepted path
+  for captioned batches because preview/metadata mismatches were observed.
 - Confirm the form's binary File row works, without base64/text conversion, and
   that a successful S3 response is actually exposed as XML by your OS version.
 - Check objects under `incoming/shortcut/` as an administrator; originals remain
@@ -310,9 +347,10 @@ After deployment, test:
 - After the daily job, verify the processed images join the eligible pool. No
   upload completion callback or immediate processor invocation is implemented.
 - With captions: test a photo with known location/date, one without either, and a
-  two-photo batch. Check that defaults reset, preview and edit refer to the current
-  photo, both prompts are editable, accented names survive, and Preserve Metadata
-  remains off. Check both EN/DE labels on the site after processing. A labelled
+  two-photo batch from the **in-Shortcut picker**. Check that defaults reset,
+  preview and edit refer to the current photo, both prompts are editable, accented
+  names survive, and Preserve Metadata remains off. Check both EN/DE labels on
+  the site after processing. A labelled
   re-upload of today's image should update its caption without changing its image.
   Cancel review and verify there is no false success notification.
 

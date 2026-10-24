@@ -118,7 +118,10 @@ or overwrite `background.json`, inventories, or images.
 [Apple Shortcut upload](shortcut-upload.md) adds personal, token-authenticated
 uploads from the iPhone/iPad sharing dialog, synced privately from the Mac via
 iCloud. It needs its own [IAM bootstrap](upload-iam/README.md) and endpoint
-deployment. The manual alternative below remains available.
+deployment. Share one photo at a time, or launch the Shortcut directly and use its
+photo picker for batches. Multi-photo share-sheet input showed preview/location
+mismatches during manual testing; see [supported selection paths](shortcut-upload.md#supported-photo-selection-paths).
+The manual alternative below remains available.
 
 Use an administrator or an identity separately authorized to upload media. The
 `henning-site` deployer's direct media-object permissions cover only read/write
