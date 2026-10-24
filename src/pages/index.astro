@@ -13,15 +13,11 @@ import { SITE } from "../config";
     <meta property="og:title" content={SITE.name} />
     <meta property="og:description" content={SITE.domain} />
     <script>
+      import { getLocale } from "../locale";
+
       // Runs before first paint: apply persisted or auto-detected locale.
       (function () {
-        var stored = localStorage.getItem("locale");
-        var locale =
-          stored === "en" || stored === "de"
-            ? stored
-            : (navigator.language || "en").toLowerCase().startsWith("de")
-              ? "de"
-              : "en";
+        const locale = getLocale();
         document.documentElement.setAttribute("data-locale", locale);
         document.documentElement.setAttribute("lang", locale);
       })();
@@ -123,14 +119,18 @@ import { SITE } from "../config";
               ausgeliefert, ohne Anfragen an externe Fotodienste.
             </p>
             <p data-locale-content="en">
-              Your chosen language is stored only in your browser's local
-              storage, so it is remembered on your next visit. It is not sent to
+              If you choose a language different from your browser's default,
+              that preference is stored only in your browser's local storage,
+              so it is remembered on your next visit. Choosing the default again
+              removes the preference. It is not sent to
               us and used for no other purpose. You can clear it at any time in
               your browser's settings.
             </p>
             <p data-locale-content="de" hidden>
-              Ihre gewählte Sprache wird ausschließlich lokal in Ihrem Browser
+              Wenn Sie eine andere Sprache als die Standardsprache Ihres Browsers
+              wählen, wird diese Einstellung ausschließlich lokal in Ihrem Browser
               gespeichert, damit sie bei Ihrem nächsten Besuch erhalten bleibt.
+              Wenn Sie wieder die Standardsprache wählen, wird die Einstellung gelöscht.
               Sie wird nicht an uns übermittelt und zu keinem anderen Zweck
               verwendet. Sie können sie jederzeit in den Einstellungen Ihres
               Browsers löschen.
@@ -160,7 +160,8 @@ import { SITE } from "../config";
     </main>
 
     <script>
-      import { pickGreeting } from "../config";
+      import { pickGreeting, type Locale } from "../config";
+      import { getLocale, isLocale, saveLocale } from "../locale";
       import { createBackgroundUpdater } from "../background";
 
       const background = document.querySelector<HTMLImageElement>("#background-photo");
@@ -176,15 +177,22 @@ import { SITE } from "../config";
       }
 
       (function () {
-        var html = document.documentElement;
+        const html = document.documentElement;
+        const initialLocale = html.getAttribute("data-locale");
+        let activeLocale = isLocale(initialLocale) ? initialLocale : getLocale();
 
-        function apply(loc) {
+        function updateGreeting(locale: Locale) {
+          document.querySelectorAll<HTMLElement>(".greeting").forEach(function (g) {
+            if (g.getAttribute("data-locale-content") === locale)
+              g.textContent = pickGreeting(locale, new Date().getHours());
+          });
+        }
+
+        function applyLocale(loc: Locale) {
+          activeLocale = loc;
           html.setAttribute("data-locale", loc);
           html.setAttribute("lang", loc);
-          try {
-            localStorage.setItem("locale", loc);
-          } catch {}
-          document.querySelectorAll("[data-locale-content]").forEach(function (el) {
+          document.querySelectorAll<HTMLElement>("[data-locale-content]").forEach(function (el) {
             el.hidden = el.getAttribute("data-locale-content") !== loc;
           });
           document
@@ -197,27 +205,25 @@ import { SITE } from "../config";
             });
           document.title = "Henning Petersen";
 
-        // Show the time-of-day greeting for the active locale.
-        document.querySelectorAll(".greeting").forEach(function (g) {
-          if (g.getAttribute("data-locale-content") === loc)
-            g.textContent = pickGreeting(loc, new Date().getHours());
-        });
+          updateGreeting(loc);
         }
 
         document.querySelectorAll("[data-choose-locale]").forEach(function (btn) {
           btn.addEventListener("click", function () {
-            apply(btn.getAttribute("data-choose-locale"));
+            const locale = btn.getAttribute("data-choose-locale");
+            if (!isLocale(locale)) return;
+            applyLocale(locale);
+            saveLocale(locale);
           });
         });
 
-        // Sync initial state (apply may not have run after head script set it).
-        apply(html.getAttribute("data-locale") || "en");
+        applyLocale(activeLocale);
 
         // Refresh the greeting on a light cadence so a tab left open across a
         // time boundary still shows the right one.
         setInterval(function () {
-            apply(html.getAttribute("data-locale") || "en");
-          }, 60000);
+          updateGreeting(activeLocale);
+        }, 60000);
       })();
     </script>
 
