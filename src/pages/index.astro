@@ -229,6 +229,7 @@ import { SITE } from "../config";
       :root {
         --bg: #f4f5f7;
         --photo-overlay: rgb(244 245 247 / 50%);
+        --caption-shadow: rgb(255 255 255 / 60%);
         --card: #ffffff;
         --text: #1a1d23;
         --muted: #5c6370;
@@ -243,6 +244,7 @@ import { SITE } from "../config";
         :root {
           --bg: #101216;
           --photo-overlay: rgb(16 18 22 / 50%);
+          --caption-shadow: rgb(0 0 0 / 60%);
           --card: #181b21;
           --text: #e7e9ee;
           --muted: #9aa1ad;
@@ -314,8 +316,8 @@ import { SITE } from "../config";
         margin: 0;
         padding: 0.3rem 0.65rem;
         border-radius: 0.4rem;
-        text-shadow: 0 1px 3px rgb(0 0 0 / 80%);
-        color: #fff;
+        text-shadow: 0 1px 3px var(--caption-shadow);
+        color: var(--text);
         font-size: 0.75rem;
         overflow-wrap: anywhere;
       }
