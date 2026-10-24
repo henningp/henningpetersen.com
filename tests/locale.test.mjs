@@ -73,6 +73,7 @@ test("initialization and greeting refresh never persist; switching works without
     const greetings = [element("en"), element("de")];
     const buttons = [element("en"), element("de")];
     let refresh;
+    const captionLocales = [];
     let hour = 8;
     vm.runInNewContext(ts.transpileModule(script, {
       compilerOptions: { target: ts.ScriptTarget.ESNext },
@@ -92,23 +93,28 @@ test("initialization and greeting refresh never persist; switching works without
       saveLocale: (locale) => saveLocale(locale, "de", access),
       isLocale,
       pickGreeting,
+      backgroundCaption: { setLocale(locale) { captionLocales.push(locale); } },
       Date: class { getHours() { return hour; } },
       setInterval(callback, delay) { assert.equal(delay, 60000); refresh = callback; },
     });
     assert.equal(attributes.get("lang"), "de");
+    assert.deepEqual(captionLocales, ["de"]);
     assert.equal(greetings[1].textContent, "Guten Morgen!");
     hour = 13;
     refresh();
     assert.equal(greetings[1].textContent, "Guten Tag!");
+    assert.deepEqual(captionLocales, ["de"]);
     assert.deepEqual(storage.writes, []);
     buttons[0].click();
     assert.equal(attributes.get("lang"), "en");
+    assert.deepEqual(captionLocales, ["de", "en"]);
     assert.equal(greetings[0].textContent, "Good afternoon!");
     hour = 19;
     refresh();
     assert.equal(greetings[0].textContent, "Good evening!");
     assert.deepEqual(storage.writes, blocked ? [] : ["en"]);
     buttons[1].click();
+    assert.deepEqual(captionLocales, ["de", "en", "de"]);
     assert.equal(greetings[1].textContent, "Guten Abend!");
     assert.deepEqual(storage.writes, blocked ? [] : ["en", null]);
   }

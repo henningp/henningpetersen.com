@@ -15,17 +15,36 @@ Shortcut ── multipart JPEG upload ─▶ S3 incoming/shortcut/<random-id>.jp
                                   public background pool
 ```
 
-The signing endpoint is `POST /uploads`. Its JSON request contains exactly:
+The signing endpoint is `POST /uploads`. The original JSON request remains valid:
 
 ```json
 {"content_type":"image/jpeg"}
 ```
+
+Caption-aware clients may additionally send optional `label` and `year` fields:
+
+```json
+{"content_type":"image/jpeg","label":{"en":"Lake Constance","de":"Bodensee"},"year":2012}
+```
+
+Only `en` and `de` labels are accepted. Each is single-line text of at most 120
+Unicode characters; surrounding whitespace is trimmed and blank labels omitted.
+Either language may be missing. `year`, if supplied, must be a JSON integer from
+1000 to 9999; omit it when the capture date is unknown. No other request fields
+are accepted. The JSON request limit is 4 KiB.
 
 It returns `url`, `fields`, `expires_in`, and `max_bytes`. The second request is
 **POST multipart/form-data**, not PUT or JSON. Using S3's signed form policy lets
 S3 enforce the **1 byte–30 MiB** range without relying on Shortcuts' file-size
 formatting. It also requires the exact private key, `image/jpeg` form field, and
 success status `201`. Image bytes never pass through API Gateway or Lambda.
+
+Requests containing `label` or `year` also receive an `x-amz-meta-caption` form
+field—even if the caption is empty. This is an opaque, signed, ASCII-safe encoding
+of the approved labels/year. Copy it verbatim into the S3 form; do not decode,
+rebuild, translate, or edit it. S3 rejects missing or changed signed metadata.
+Legacy requests receive exactly the original form fields, with no metadata field.
+The metadata is stored privately on the uploaded object, not embedded in the JPEG.
 
 An upload is queued, **not immediately processed or published**. The existing
 daily job and same-day selection behavior are unchanged. MIME declarations are
@@ -187,6 +206,72 @@ failure remain in S3. Retry the missing photos; retrying the entire batch can
 create duplicate originals (the processor deduplicates identical derivatives).
 This first version does not promise automatic continue-on-error batch retries.
 
+### Optional extension: preview and review bilingual captions
+
+Deploy the caption-capable Lambdas and website **before changing your working
+Shortcut**; see [the rollout sequence](backgrounds.md#caption-rollout). The original
+recipe above continues to work unchanged. These additions remain inside the
+existing **Repeat with Each** loop, so a batch is reviewed one image at a time.
+
+#### Before B: read details, preview, and edit
+
+1. Initialize `Suggested Location` and `Capture Year` to empty Text **on every
+   iteration**, so a photo cannot inherit the previous photo's metadata.
+2. **Get Details of Images → Location**, explicitly from the original `Repeat
+   Item`, not the converted `JPEG`. If Location has a value, use **Get Details of
+   Locations → City** as the suggestion; if City is empty, try **Name**. Set
+   `Suggested Location` to that text. A lookup may need network access; its result
+   is only a suggestion, not necessarily the landmark's name. Never use **Get
+   Current Location** as a fallback.
+3. **Get Details of Images → Date Taken**, again from the original `Repeat Item`.
+   If it has a value, use **Format Date → Custom → `yyyy`**, then **Get Numbers
+   from Input → Get Item from List → First Item** to obtain a Number and set
+   `Capture Year` to it. Use Date Taken, not the file's creation date or today's
+   date. Leave missing dates blank; optionally add an edit prompt for the year.
+4. **Quick Look** the original `Repeat Item`. Dismiss the preview to continue.
+   Native Shortcuts does not provide a combined image-and-text-edit form here:
+   preview and editing are sequential.
+5. **Ask for Input → Text**, prompt `English location — photo [Repeat Index]`
+   (optionally include `Capture Year`), **Default Answer** `Suggested Location`.
+   Save as `Label EN`. Leave it blank if you want no location label.
+6. **Ask for Input → Text**, prompt `German location — photo [Repeat Index]`,
+   **Default Answer** `Label EN`. Save as `Label DE`. Most proper names can simply
+   be confirmed unchanged. There is no automatic translation service.
+
+Then run B's normal JPEG conversion with **Preserve Metadata off**. Metadata only
+supplies defaults locally; only approved labels/year are sent separately. Photos'
+sharing options/permissions can remove location before Shortcuts receives it;
+in that case you can still type the label. Verify Location and Date Taken on the
+actual share-sheet input rather than assuming every photo has them.
+
+#### Extend C's JSON body and D's form
+
+- In C, retain `content_type` and add a **Dictionary** JSON field `label`, with
+  nested **Text** fields `en` → `Label EN` and `de` → `Label DE`. Always include
+  this dictionary, even when both strings are blank.
+- When `Capture Year` has a value, add JSON field `year` with type **Number** and
+  value `Capture Year`. Otherwise omit the key entirely—not empty Text or `null`.
+  For editors that cannot conditionally omit JSON fields, put **Get Contents of
+  URL** in an **If Capture Year has any value / Otherwise** pair: both branches
+  send `content_type` and the nested `label`, but only the first adds `year`.
+  In each branch, set `Authorization Response` to that request's output, then
+  continue with C's existing response extraction after **End If**.
+- In D, extract a **tenth Text value**, `x-amz-meta-caption`, from `Form Fields`
+  before the upload request. Stop with an error if it is absent: this workflow
+  requires the updated endpoint.
+- Add form row **`x-amz-meta-caption` | Text | extracted value** before `file`.
+  Keep all nine original fields and keep **`file` last, type File**. Do not try to
+  create the metadata value yourself. Even an entirely empty caption receives
+  this field because the signing request explicitly includes `label`.
+- Obtain the signed form **after** preview/editing, as in this sequence, so the
+  five-minute expiry does not run down while you review captions.
+
+The website uses its existing EN/DE selection. It falls back to the other label
+when a translation is missing, then to year alone, and hides an empty caption.
+Captions are plain text, not HTML. Labelled re-uploads of identical processed
+images take precedence over old unlabelled copies without increasing their
+selection probability. Existing originals are not automatically deleted.
+
 ## Sync privately to iPhone/iPad
 
 1. Enable **Shortcuts in iCloud** on the Mac and each iPhone/iPad, using your own
@@ -224,6 +309,12 @@ After deployment, test:
 - Interrupt a batch; verify there is no false whole-batch success notification.
 - After the daily job, verify the processed images join the eligible pool. No
   upload completion callback or immediate processor invocation is implemented.
+- With captions: test a photo with known location/date, one without either, and a
+  two-photo batch. Check that defaults reset, preview and edit refer to the current
+  photo, both prompts are editable, accented names survive, and Preserve Metadata
+  remains off. Check both EN/DE labels on the site after processing. A labelled
+  re-upload of today's image should update its caption without changing its image.
+  Cancel review and verify there is no false success notification.
 
 To run SDK-only tests locally without contacting AWS, install `boto3` in your
 isolated test environment and run:

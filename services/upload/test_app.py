@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from app import EXPIRY_SECONDS, MAX_BYTES, MAX_REQUEST_BYTES, handle, handler, signed_upload
+from app import EXPIRY_SECONDS, MAX_BYTES, MAX_REQUEST_BYTES, caption_fields, handle, handler, signed_upload
 
 # Test-only fake token, never a usable credential.
 TOKEN = "test_only_" + "x" * 40
@@ -32,8 +32,9 @@ class EndpointTests(unittest.TestCase):
         self.lookups += 1
         return DIGEST
 
-    def sign(self):
+    def sign(self, caption):
         self.signs += 1
+        self.caption = caption
         return {"url": "https://bucket.s3.eu-central-1.amazonaws.com/", "fields": {"key": "incoming/shortcut/test.jpg"}}
 
     def run_request(self, event=None):
@@ -49,6 +50,35 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual(body["fields"]["key"], "incoming/shortcut/test.jpg")
         self.assertEqual(self.signs, 1)
         self.assertNotIn(TOKEN, response["body"])
+        self.assertIsNone(self.caption)
+
+    def test_optional_bilingual_caption_is_trimmed_and_passed_to_signer(self):
+        body = {"content_type": "image/jpeg", "label": {"en": " Lake Constance ", "de": "Bodensee"}, "year": 2012}
+        self.assertEqual(self.run_request(request(json.dumps(body)))["statusCode"], 200)
+        self.assertEqual(self.caption, {"label": {"en": "Lake Constance", "de": "Bodensee"}, "year": 2012})
+
+    def test_partial_empty_and_year_only_captions(self):
+        for fields, expected in [
+            ({"label": {"en": "Crater Lake"}}, {"label": {"en": "Crater Lake"}}),
+            ({"label": {"en": " ", "de": ""}}, {}),
+            ({"year": 2012}, {"year": 2012}),
+        ]:
+            with self.subTest(fields=fields):
+                body = {"content_type": "image/jpeg", **fields}
+                self.assertEqual(self.run_request(request(json.dumps(body)))["statusCode"], 200)
+                self.assertEqual(self.caption, expected)
+
+    def test_invalid_caption_fields_never_sign(self):
+        for fields in [
+            {"label": None}, {"label": "Lake"}, {"label": {"fr": "Lac"}},
+            {"label": {"en": 42}}, {"label": {"en": "x" * 121}},
+            {"label": {"en": "line\nbreak"}}, {"label": {"de": "\ud800"}},
+            *({"year": value} for value in (None, True, "2012", 2012.0, 999, 10000)),
+        ]:
+            with self.subTest(fields=fields):
+                body = {"content_type": "image/jpeg", **fields}
+                self.assertEqual(self.run_request(request(json.dumps(body)))["statusCode"], 400)
+        self.assertEqual(self.signs, 0)
 
     def test_invalid_auth_never_signs(self):
         for token in ("", "short", TOKEN + "different", "x" * 129, "é" * 50):
@@ -106,6 +136,7 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual(self.run_request(event)["statusCode"], 200)
         event["body"] = "not valid base64!"
         self.assertEqual(self.run_request(event)["statusCode"], 400)
+        self.assertEqual(self.run_request(request(body="[" * 1100))["statusCode"], 400)
 
     def test_wrong_method_path_or_content_type_never_signs(self):
         event = request()
@@ -120,14 +151,14 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual(self.signs, 0)
 
     def test_signer_errors_do_not_expose_credentials(self):
-        def failed():
+        def failed(caption):
             raise RuntimeError(TOKEN)
         response = handle(request(), self.token_hash, failed)
         self.assertEqual(response["statusCode"], 503)
         self.assertNotIn(TOKEN, response["body"])
 
     def test_sensitive_details_are_not_logged(self):
-        def failed():
+        def failed(caption):
             raise RuntimeError("private-token-and-signed-url")
         with self.assertLogs("app", level="ERROR") as logs:
             handle(request(), self.token_hash, failed)
@@ -136,6 +167,33 @@ class EndpointTests(unittest.TestCase):
 
 
 class SigningTests(unittest.TestCase):
+    def test_explicit_empty_caption_still_returns_the_new_form_field(self):
+        class S3:
+            def generate_presigned_post(self, **kwargs):
+                return kwargs
+        fields = signed_upload(S3(), "bucket", {})["Fields"]
+        self.assertEqual(json.loads(base64.b64decode(fields["x-amz-meta-caption"])), {})
+
+    def test_caption_is_ascii_encoded_and_bound_to_the_signed_policy(self):
+        class S3:
+            def generate_presigned_post(self, **kwargs):
+                return kwargs
+        caption = {"label": {"en": "Munich", "de": "München"}, "year": 2012}
+        result = signed_upload(S3(), "bucket", caption)
+        encoded = result["Fields"]["x-amz-meta-caption"]
+        self.assertTrue(encoded.isascii())
+        self.assertEqual(json.loads(base64.b64decode(encoded)), caption)
+        self.assertIn({"x-amz-meta-caption": encoded}, result["Conditions"])
+
+    def test_maximum_unicode_caption_fits_s3_metadata_and_request_limits(self):
+        class S3:
+            def generate_presigned_post(self, **kwargs):
+                return kwargs
+        value = {"content_type": "image/jpeg", "label": {"en": "🌍" * 120, "de": "🌍" * 120}, "year": 2012}
+        self.assertLess(len(json.dumps(value).encode()), MAX_REQUEST_BYTES)
+        fields = signed_upload(S3(), "bucket", caption_fields(value))["Fields"]
+        self.assertLess(len(fields["x-amz-meta-caption"]) + len("caption"), 2048)
+
     def test_form_is_fixed_to_jpeg_size_expiry_and_unique_private_key(self):
         class S3:
             def generate_presigned_post(self, **kwargs):
@@ -221,6 +279,13 @@ class SdkTests(unittest.TestCase):
             "key", "Content-Type", "success_action_status", "policy", "x-amz-algorithm",
             "x-amz-credential", "x-amz-date", "x-amz-security-token", "x-amz-signature",
         })
+
+        caption = {"label": {"en": "Lake Constance", "de": "Bodensee"}, "year": 2012}
+        labelled = signed_upload(s3, "test-background-bucket", caption)
+        encoded = labelled["fields"]["x-amz-meta-caption"]
+        policy = json.loads(base64.b64decode(labelled["fields"]["policy"]))
+        self.assertIn({"x-amz-meta-caption": encoded}, policy["conditions"])
+        self.assertEqual(json.loads(base64.b64decode(encoded)), caption)
 
 
 class PermissionTests(unittest.TestCase):

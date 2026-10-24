@@ -151,15 +151,19 @@ import { SITE } from "../config";
         </details>
       </footer>
     </main>
+    <p id="background-caption" class="background-caption" hidden></p>
 
     <script>
       import { pickGreeting, type Locale } from "../config";
       import { getLocale, isLocale, saveLocale } from "../locale";
-      import { createBackgroundUpdater } from "../background";
+      import { createBackgroundCaption, createBackgroundUpdater } from "../background";
 
+      const backgroundCaption = createBackgroundCaption(
+        document.querySelector<HTMLElement>("#background-caption"), getLocale(),
+      );
       const background = document.querySelector<HTMLImageElement>("#background-photo");
       if (background) {
-        const updateBackground = createBackgroundUpdater(background);
+        const updateBackground = createBackgroundUpdater(background, fetch, undefined, backgroundCaption);
         void updateBackground();
         setInterval(() => {
           if (document.visibilityState === "visible") void updateBackground();
@@ -199,6 +203,7 @@ import { SITE } from "../config";
           document.title = "Henning Petersen";
 
           updateGreeting(loc);
+          backgroundCaption.setLocale(loc);
         }
 
         document.querySelectorAll("[data-choose-locale]").forEach(function (btn) {
@@ -300,6 +305,27 @@ import { SITE } from "../config";
       }
       .background-scrim {
         background: var(--photo-overlay);
+      }
+      .background-caption {
+        position: fixed;
+        right: max(1rem, env(safe-area-inset-right));
+        bottom: max(1rem, env(safe-area-inset-bottom));
+        max-width: min(28rem, calc(100% - 2rem));
+        margin: 0;
+        padding: 0.3rem 0.65rem;
+        border-radius: 0.4rem;
+        background: rgb(0 0 0 / 75%);
+        color: #fff;
+        font-size: 0.75rem;
+        overflow-wrap: anywhere;
+      }
+      /* Keep long captions out of the footer's way on small screens. */
+      @media (max-width: 40rem), (max-height: 35rem) {
+        .background-caption {
+          position: static;
+          align-self: flex-end;
+          margin: 0 1rem 1rem;
+        }
       }
       @media (prefers-reduced-motion: reduce) {
         .background img {

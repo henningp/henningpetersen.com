@@ -1,5 +1,6 @@
 """Daily S3 photo processing and publication. No public endpoint or credentials."""
 
+import base64
 import hashlib
 import io
 import json
@@ -7,6 +8,7 @@ import logging
 import os
 import re
 import secrets
+import unicodedata
 import warnings
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
@@ -19,7 +21,42 @@ EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"}
 PHOTO_KEY = re.compile(r"photos/[a-f0-9]{64}\.jpg\Z")
 STATE_KEY = "state/inventory.json"
 POINTER_KEY = "background.json"
-PIPELINE_VERSION = 2
+PIPELINE_VERSION = 3
+
+
+def read_caption(metadata):
+    """Read only approved caption fields, never source EXIF or other metadata."""
+    encoded = metadata.get("caption", "")
+    if not isinstance(encoded, str) or not encoded or len(encoded) > 2000:
+        return {}
+    try:
+        value = json.loads(base64.b64decode(encoded, validate=True))
+        if not isinstance(value, dict):
+            return {}
+        labels = value.get("label", {})
+        if not isinstance(labels, dict):
+            return {}
+        clean = {}
+        for locale in ("en", "de"):
+            text = labels.get(locale)
+            if (isinstance(text, str) and len(text) <= 120
+                    and not any(unicodedata.category(char) in {"Cc", "Cs"} for char in text)
+                    and text.strip()):
+                clean[locale] = text.strip()
+        caption = {"label": clean} if clean else {}
+        year = value.get("year")
+        if type(year) is int and 1000 <= year <= 9999:
+            caption["year"] = year
+        return caption
+    except (ValueError, UnicodeError, RecursionError):
+        # Invalid manually supplied metadata must not prevent photo publication.
+        return {}
+
+
+def caption_rank(record):
+    # Prefer reviewed labels over unlabelled duplicates, then more translations,
+    # then a known year. Sorted source keys break ties without mixing captions.
+    return len(record.get("label", {})), "year" in record
 
 
 def missing_object(error):
@@ -68,7 +105,7 @@ class S3Store:
             data = body.read(MAX_BYTES + 1)
         if len(data) > MAX_BYTES:
             raise ValueError("An incoming image exceeds the 30 MiB limit")
-        return data
+        return data, read_caption(response.get("Metadata", {}))
 
     def write(self, key, data, content_type, cache_control):
         self.client.put_object(
@@ -168,20 +205,26 @@ def sync(store, now=None, render=render_photo, choose=secrets.choice):
             (previous_state or {}).get("version") == PIPELINE_VERSION
             and old.get("etag") == item["ETag"]
             and old.get("size") == item["Size"]
+            and old.get("modified") == str(item.get("LastModified", ""))
             and PHOTO_KEY.fullmatch(old.get("key", ""))
             and store.exists(old["key"])
         ):
             record = old
         else:
-            data, width, height = render(store.download(item))
+            original, caption = store.download(item)
+            data, width, height = render(original)
             key = f"photos/{hashlib.sha256(data).hexdigest()}.jpg"
             store.write(key, data, "image/jpeg", "public, max-age=31536000, immutable")
             record = {
                 "etag": item["ETag"], "size": item["Size"],
+                "modified": str(item.get("LastModified", "")),
                 "key": key, "width": width, "height": height,
+                **caption,
             }
         sources[item["Key"]] = record
-        photos["/" + record["key"]] = record
+        src = "/" + record["key"]
+        if src not in photos or caption_rank(record) > caption_rank(photos[src]):
+            photos[src] = record
 
     state = {"version": PIPELINE_VERSION, "sources": sources}
     if state != previous_state:
@@ -189,16 +232,21 @@ def sync(store, now=None, render=render_photo, choose=secrets.choice):
 
     # Same-day retries/manual runs retain the published choice while it is eligible.
     if current and current.get("day") == day and current.get("src") in photos:
-        return {"status": "unchanged", "images": len(photos)}
-
-    candidates = sorted(photos)
-    if len(candidates) > 1 and current and current.get("src") in candidates:
-        candidates.remove(current["src"])
-    src = choose(candidates)
+        src = current["src"]
+        photo = photos[src]
+        if all(current.get(field) == photo.get(field) for field in ("label", "year")):
+            return {"status": "unchanged", "images": len(photos)}
+        # A labelled re-upload can update today's caption without changing its image.
+    else:
+        candidates = sorted(photos)
+        if len(candidates) > 1 and current and current.get("src") in candidates:
+            candidates.remove(current["src"])
+        src = choose(candidates)
     photo = photos[src]
     selection = {
         "src": src, "width": photo["width"], "height": photo["height"],
         "day": day, "updated": now.astimezone(timezone.utc).isoformat(),
+        **{field: photo[field] for field in ("label", "year") if field in photo},
     }
     # Last write: readers can never see a pointer to an image not yet uploaded.
     # Compare-and-swap: overlapping invocations cannot replace another run's choice.

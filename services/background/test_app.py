@@ -1,3 +1,4 @@
+import base64
 import copy
 import hashlib
 import io
@@ -5,7 +6,7 @@ import json
 import unittest
 from datetime import datetime, timedelta, timezone
 
-from app import MAX_BYTES, POINTER_KEY, STATE_KEY, S3Store, render_photo, sync
+from app import MAX_BYTES, POINTER_KEY, STATE_KEY, S3Store, read_caption, render_photo, sync
 
 NOW = datetime(2026, 10, 16, 3, tzinfo=timezone.utc)
 
@@ -16,10 +17,13 @@ class MemoryStore:
         self.objects = {}
         self.writes = []
         self.downloads = []
+        self.captions = {}
+        self.modified = {}
         self.fail_key = None
 
     def incoming(self):
-        return [{"Key": key, "ETag": hashlib.sha256(data).hexdigest(), "Size": len(data)}
+        return [{"Key": key, "ETag": hashlib.sha256(data).hexdigest(), "Size": len(data),
+                 "LastModified": self.modified.get(key, "initial")}
                 for key, data in self.uploads.items()]
 
     def read_json(self, key, with_etag=False):
@@ -32,7 +36,7 @@ class MemoryStore:
 
     def download(self, item):
         self.downloads.append(item["Key"])
-        return self.uploads[item["Key"]]
+        return self.uploads[item["Key"]], self.captions.get(item["Key"], {})
 
     def write(self, key, data, content_type, cache_control):
         if key == self.fail_key:
@@ -81,6 +85,63 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(self.store.objects[POINTER_KEY], pointer)
         self.assertEqual(self.store.writes, [])
         self.assertEqual(self.store.downloads, [])
+
+    def test_bilingual_caption_is_published_and_cached_without_other_metadata(self):
+        self.store.uploads.pop("incoming/two.png")
+        caption = {"label": {"en": "Lake Constance", "de": "Bodensee"}, "year": 2012}
+        self.store.captions["incoming/one.jpg"] = caption
+        self.run_sync()
+        pointer = self.store.objects[POINTER_KEY]
+        self.assertEqual(pointer["label"], caption["label"])
+        self.assertEqual(pointer["year"], 2012)
+        self.store.downloads.clear()
+        self.assertEqual(self.run_sync()["status"], "unchanged")
+        self.assertEqual(self.store.downloads, [])
+
+    def test_labelled_duplicate_updates_caption_but_not_todays_photo(self):
+        self.store.uploads.pop("incoming/two.png")
+        self.run_sync()
+        before = copy.deepcopy(self.store.objects[POINTER_KEY])
+        self.store.uploads["incoming/reupload.jpg"] = self.store.uploads["incoming/one.jpg"]
+        self.store.captions["incoming/reupload.jpg"] = {"label": {"en": "Crater Lake"}, "year": 2012}
+        self.assertEqual(self.run_sync(), {"status": "published", "images": 1, "day": "2026-10-16"})
+        pointer = self.store.objects[POINTER_KEY]
+        self.assertEqual(pointer["src"], before["src"])
+        self.assertEqual(pointer["label"], {"en": "Crater Lake"})
+        self.assertEqual(self.run_sync()["status"], "unchanged")
+
+    def test_duplicate_caption_preference_and_ties_are_deterministic(self):
+        self.store.uploads = {key: b"same" for key in (
+            "incoming/z.jpg", "incoming/d.jpg", "incoming/c.jpg", "incoming/b.jpg", "incoming/a.jpg")}
+        self.store.captions = {
+            "incoming/b.jpg": {"year": 2012},
+            "incoming/c.jpg": {"label": {"en": "One language"}, "year": 2012},
+            "incoming/d.jpg": {"label": {"en": "Winner", "de": "Gewinner"}, "year": 2012},
+            "incoming/z.jpg": {"label": {"en": "Other", "de": "Andere"}, "year": 2020},
+        }
+        self.assertEqual(self.run_sync()["images"], 1)
+        self.assertEqual(self.store.objects[POINTER_KEY]["label"]["en"], "Winner")
+        self.assertEqual(self.store.objects[POINTER_KEY]["year"], 2012)
+
+    def test_metadata_only_source_replacement_refreshes_and_can_clear_caption(self):
+        self.store.uploads.pop("incoming/two.png")
+        self.store.captions["incoming/one.jpg"] = {"year": 2012}
+        self.run_sync()
+        before = self.store.objects[POINTER_KEY]["src"]
+        self.store.captions.clear()
+        self.store.modified["incoming/one.jpg"] = "replaced"
+        self.store.downloads.clear()
+        self.run_sync()
+        self.assertEqual(self.store.downloads, ["incoming/one.jpg"])
+        self.assertEqual(self.store.objects[POINTER_KEY]["src"], before)
+        self.assertNotIn("year", self.store.objects[POINTER_KEY])
+
+    def test_old_inventory_is_reprocessed_for_caption_support(self):
+        self.run_sync()
+        self.store.objects[STATE_KEY]["version"] = 2
+        self.store.downloads.clear()
+        self.run_sync()
+        self.assertEqual(len(self.store.downloads), 2)
 
     def test_next_day_avoids_previous_image(self):
         self.run_sync()
@@ -256,10 +317,14 @@ class AdapterTests(unittest.TestCase):
             def get_object(self, **kwargs):
                 self.arguments = kwargs
                 self.body = io.BytesIO(b"photo")
-                return {"Body": self.body}
+                return {"Body": self.body, "Metadata": {
+                    "caption": base64.b64encode(b'{"label":{"de":"Bodensee"},"year":2012}').decode(),
+                    "private": "must not leak",
+                }}
         client = Client()
         store = S3Store(client, "bucket")
-        self.assertEqual(store.download({"Key": "incoming/a.jpg", "ETag": '"etag"'}), b"photo")
+        self.assertEqual(store.download({"Key": "incoming/a.jpg", "ETag": '"etag"'}),
+                         (b"photo", {"label": {"de": "Bodensee"}, "year": 2012}))
         self.assertEqual(client.arguments["IfMatch"], '"etag"')
         self.assertTrue(client.body.closed)
 
@@ -276,6 +341,29 @@ class AdapterTests(unittest.TestCase):
         items = S3Store(client, "bucket").incoming()
         self.assertEqual(len(items), 2)
         self.assertEqual(client.arguments["Prefix"], "incoming/")
+
+
+class CaptionTests(unittest.TestCase):
+    def test_missing_or_malformed_metadata_is_ignored(self):
+        for encoded in (None, "", "!invalid", "x" * 2001,
+                        base64.b64encode(b"not json").decode(),
+                        base64.b64encode(b"[" * 1100).decode(),
+                        base64.b64encode(b"\xff").decode()):
+            self.assertEqual(read_caption({"caption": encoded}), {})
+        self.assertEqual(read_caption({}), {})
+
+    def test_only_valid_approved_fields_survive(self):
+        for value, expected in [
+            ([], {}), ({"label": "bad"}, {}),
+            ({"label": {"en": " Lake ", "de": "See", "fr": "Lac"}, "year": 2012, "gps": "private"},
+             {"label": {"en": "Lake", "de": "See"}, "year": 2012}),
+            ({"label": {"en": "x" * 121, "de": "bad\nlabel"}, "year": True}, {}),
+            ({"label": {"en": 42}, "year": "2012"}, {}),
+            ({"label": {"en": ""}, "year": 2012}, {"year": 2012}),
+        ]:
+            with self.subTest(value=value):
+                encoded = base64.b64encode(json.dumps(value).encode()).decode()
+                self.assertEqual(read_caption({"caption": encoded}), expected)
 
 
 try:

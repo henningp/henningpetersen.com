@@ -15,10 +15,13 @@ deployment stay unchanged.
    orientation, converts embedded color profiles to sRGB, fits the image within
    2560 × 2560 without upscaling, flattens transparency on white, and strips source
    metadata. It skips reprocessing unchanged sources using private `state/` data.
+   Optional reviewed EN/DE labels and a capture year are read from private S3 object
+   metadata, not EXIF; only those approved caption fields are published.
 4. Lambda chooses one image for the UTC calendar day, avoiding the previous
    selection when alternatives exist. It uploads images before publishing the
    small `background.json` pointer. Same-day retries/manual runs keep today's
-   choice unless its source was removed or changed.
+   image choice unless its source was removed or changed; caption updates can be
+   published without changing the image.
 5. The existing CloudFront distribution serves `/photos/*` and `/background.json`
    through the same website domain. Its bucket permission excludes originals and
    state. Photos cache for one year; the pointer caches at the CDN for at most
@@ -29,6 +32,37 @@ deployment stay unchanged.
    change (CDN cache plus polling). No-JS/network failures keep the solid fallback
    or last successfully loaded photo; no visitor identifier or extra localStorage
    entry is used.
+7. A discreet caption follows the existing EN/DE language selection. Missing
+   translations fall back to the other language, then to year alone; absent
+   caption data hides the label. The caption changes only once its image loads.
+
+## Caption rollout
+
+This is backwards-compatible with existing uploads, old `background.json`
+documents, and the original Shortcut:
+
+1. Build and deploy the upload signer and background processor with the usual
+   reviewed Terraform plan. No new infrastructure or IAM permissions are needed:
+   `s3:GetObject` already returns object metadata, and `s3:PutObject` covers storing
+   signed metadata. Legacy upload requests still return the original form fields.
+2. Build and deploy the website. Existing unlabelled photos simply have no caption.
+3. Add the [optional Shortcut caption extension](shortcut-upload.md#optional-extension-preview-and-review-bilingual-captions)
+   and manually test it on the iPhone/iPad before re-uploading the library.
+
+The new processing-cache version reprocesses existing sources once to discover
+caption metadata. Later runs also detect metadata-only source replacements using
+S3 LastModified, even when the image ETag is unchanged. Caption metadata must be
+base64-encoded UTF-8 JSON under the private object's `caption` metadata key; the
+signing endpoint generates it automatically. Invalid metadata is ignored rather
+than blocking the image. Raw GPS coordinates and unrelated metadata are never
+copied into the public pointer.
+
+For identical generated images, the processor prefers a source with more
+nonempty language labels, then one with a known year. Ties use the lexicographically
+first incoming key; labels from different sources are not combined. If you need
+to correct conflicting captions, remove/replace the obsolete incoming copy with
+an authorized identity. Re-uploading all photos does not delete old originals or
+guarantee deduplication when JPEG export settings or pixels have changed.
 
 ## First deployment
 

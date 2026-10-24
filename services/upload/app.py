@@ -7,12 +7,14 @@ import json
 import logging
 import os
 import re
+import unicodedata
 import uuid
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(logging.INFO)
 MAX_BYTES = 30 * 1024 * 1024
-MAX_REQUEST_BYTES = 1024
+MAX_REQUEST_BYTES = 4096
+MAX_LABEL_LENGTH = 120
 EXPIRY_SECONDS = 300
 TOKEN = re.compile(r"[A-Za-z0-9_-]{43,128}\Z")
 TOKEN_HASH = re.compile(r"[a-f0-9]{64}\Z")
@@ -23,6 +25,33 @@ def reply(status, value):
     if status == 401:
         headers["WWW-Authenticate"] = "Bearer"
     return {"statusCode": status, "headers": headers, "body": json.dumps(value)}
+
+
+def caption_fields(value):
+    """Validate optional caption fields; no paths or arbitrary metadata are accepted."""
+    if not isinstance(value, dict) or set(value) - {"content_type", "label", "year"}:
+        raise ValueError("Invalid upload fields")
+    if value.get("content_type") != "image/jpeg":
+        raise ValueError("Only JPEG uploads are accepted")
+    caption = {}
+    labels = value.get("label", {})
+    if not isinstance(labels, dict) or set(labels) - {"en", "de"}:
+        raise ValueError("Invalid caption languages")
+    clean = {}
+    for locale, text in labels.items():
+        if (not isinstance(text, str) or len(text) > MAX_LABEL_LENGTH
+                or any(unicodedata.category(char) in {"Cc", "Cs"} for char in text)):
+            raise ValueError("Labels must be single-line text of at most 120 characters")
+        if text.strip():
+            clean[locale] = text.strip()
+    if clean:
+        caption["label"] = clean
+    if "year" in value:
+        year = value["year"]
+        if type(year) is not int or not 1000 <= year <= 9999:
+            raise ValueError("Year must be a four-digit integer")
+        caption["year"] = year
+    return caption
 
 
 def handle(event, get_token_hash, create_upload):
@@ -62,30 +91,40 @@ def handle(event, get_token_hash, create_upload):
         if len(data) > MAX_REQUEST_BYTES:
             return reply(413, {"error": "Request too large"})
         value = json.loads(data)
-    except (ValueError, UnicodeError):
+    except (ValueError, UnicodeError, RecursionError):
         return reply(400, {"error": "Invalid JSON request"})
-    if not isinstance(value, dict) or value != {"content_type": "image/jpeg"}:
-        return reply(400, {"error": "Only content_type=image/jpeg is accepted"})
+    try:
+        caption = caption_fields(value)
+    except ValueError as error:
+        return reply(400, {"error": str(error)})
 
     try:
-        upload = create_upload()
+        # Legacy requests get exactly the original form fields. Caption-aware
+        # clients always get one metadata field, even for an empty caption.
+        upload = create_upload(caption if {"label", "year"} & value.keys() else None)
     except Exception:
         LOGGER.error("Could not authorize an upload")
         return reply(503, {"error": "Upload service temporarily unavailable"})
     return reply(200, {**upload, "expires_in": EXPIRY_SECONDS, "max_bytes": MAX_BYTES})
 
 
-def signed_upload(s3, bucket):
+def signed_upload(s3, bucket, caption=None):
     # No client-controlled paths or filenames. This role cannot overwrite published
     # photos, list/read originals, delete objects, or trigger background selection.
     key = f"incoming/shortcut/{uuid.uuid4().hex}.jpg"
+    fields = {"Content-Type": "image/jpeg", "success_action_status": "201"}
+    if caption is not None:
+        # S3 metadata/form values must be ASCII. UTF-8 + base64 supports place
+        # names in either language while staying below S3's 2 KiB metadata limit.
+        fields["x-amz-meta-caption"] = base64.b64encode(
+            json.dumps(caption, ensure_ascii=False, separators=(",", ":")).encode()
+        ).decode("ascii")
     return s3.generate_presigned_post(
         Bucket=bucket,
         Key=key,
-        Fields={"Content-Type": "image/jpeg", "success_action_status": "201"},
+        Fields=fields,
         Conditions=[
-            {"Content-Type": "image/jpeg"},
-            {"success_action_status": "201"},
+            *({name: value} for name, value in fields.items()),
             ["content-length-range", 1, MAX_BYTES],
         ],
         ExpiresIn=EXPIRY_SECONDS,
@@ -110,5 +149,5 @@ def handler(event, context):
         # Read on every request: changing the hash revokes the personal token
         # without redeployment or a warm-container credential cache.
         lambda: ssm.get_parameter(Name=os.environ["TOKEN_HASH_PARAMETER"])["Parameter"]["Value"],
-        lambda: signed_upload(s3, os.environ["MEDIA_BUCKET"]),
+        lambda caption: signed_upload(s3, os.environ["MEDIA_BUCKET"], caption),
     )
