@@ -102,7 +102,7 @@ resource "aws_route53_record" "txt_apex" {
 # just guards re-application.
 #
 # p=reject asks receivers to reject mail that fails DMARC. Legitimate senders
-# must pass aligned DKIM or SPF. Keep aggregate reports enabled for monitoring.
+# must pass aligned DKIM or SPF. Aggregate email reporting is disabled.
 resource "aws_route53_record" "dmarc" {
   zone_id = aws_route53_zone.site.id
   name    = "_dmarc.${var.domain}"
@@ -111,7 +111,7 @@ resource "aws_route53_record" "dmarc" {
   allow_overwrite = true
   ttl             = 300
   records = [
-    "v=DMARC1; p=reject; pct=100; rua=mailto:hp@henningpetersen.com",
+    "v=DMARC1; p=reject; pct=100",
   ]
 }
 # Google DKIM: one TXT record containing two ordered character-strings.
