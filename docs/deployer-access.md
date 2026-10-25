@@ -109,13 +109,16 @@ scopes in the previous JSON. It grants no `iam:*` actions.
 ## S3 background-sync extension
 
 For the existing single managed policy named **`s3-deploy`**, use
-[`s3-deploy-policy.json`](s3-deploy-policy.json). It is the exact union of the
-hosting reference above and the background deployer reference below. Install it
+[`s3-deploy-policy.json`](s3-deploy-policy.json). It is the exact permission union
+of the hosting, background, and [domain redirect](redirect-iam/README.md) references.
+Optional statement IDs are omitted and identical action/condition sets are merged
+across resources to fit IAM's limit: **6,000 of 6,144 non-whitespace characters**.
+Tests check that compaction neither adds nor removes permissions. Install it
 as the default version of `s3-deploy`, retaining a previous version for rollback.
 Do not replace the hosting permissions with the background-only file. This
 combined policy is an alternative to attaching two separate deployer policies;
 the Lambda and Scheduler runtime policies still belong on their respective roles,
-not on the deployment user. When changing either source reference, update and
+not on the deployment user. When changing any source reference, update and
 recheck the combined file against IAM's managed-policy size limit.
 
 [Background sync IAM bootstrap](background-iam/README.md) contains a separate,

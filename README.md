@@ -89,6 +89,14 @@ match `terraform output route53_name_servers`.
 **Do not change MX / SPF / DMARC records as part of website or IAM maintenance.**
 Review DNS changes carefully because this domain is used for email.
 
+### Optional .de redirect
+
+The separate Terraform stack in `infra/redirect/` redirects `henningpetersen.de`
+and `www.henningpetersen.de` to HTTPS on `.com`. See
+[domain redirect setup](docs/domain-redirect.md) for staged DNS delegation,
+permissions, and the manual CloudFront Free-plan attachment. It does not change
+the website stack or its state.
+
 ## Deploy
 
 ```sh

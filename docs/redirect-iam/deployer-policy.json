@@ -1,0 +1,76 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "BootstrapRedirectZone",
+      "Effect": "Allow",
+      "Action": [
+        "route53:CreateHostedZone",
+        "route53:ListHostedZones",
+        "route53:ListHostedZonesByName"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "InspectZonesDuringRedirectBootstrap",
+      "Effect": "Allow",
+      "Action": [
+        "route53:GetHostedZone",
+        "route53:ListResourceRecordSets",
+        "route53:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:route53:::hostedzone/*"
+    },
+    {
+      "Sid": "TagZoneDuringRedirectBootstrap",
+      "Effect": "Allow",
+      "Action": "route53:ChangeTagsForResource",
+      "Resource": "arn:aws:route53:::hostedzone/*"
+    },
+    {
+      "Sid": "RedirectRecordsOnly",
+      "Effect": "Allow",
+      "Action": "route53:ChangeResourceRecordSets",
+      "Resource": "arn:aws:route53:::hostedzone/*",
+      "Condition": {
+        "ForAllValues:StringLike": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
+            "henningpetersen.de",
+            "www.henningpetersen.de",
+            "_*.henningpetersen.de"
+          ]
+        },
+        "ForAllValues:StringEquals": {
+          "route53:ChangeResourceRecordSetsRecordTypes": [
+            "A",
+            "AAAA",
+            "CNAME"
+          ]
+        },
+        "Null": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": "false",
+          "route53:ChangeResourceRecordSetsRecordTypes": "false"
+        }
+      }
+    },
+    {
+      "Sid": "ManageRedirectFunction",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:DescribeFunction",
+        "cloudfront:GetFunction",
+        "cloudfront:UpdateFunction",
+        "cloudfront:PublishFunction",
+        "cloudfront:DeleteFunction",
+        "cloudfront:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cloudfront::528099663248:function/henningpetersen-de-redirect"
+    },
+    {
+      "Sid": "CreateRedirectFunction",
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateFunction",
+      "Resource": "*"
+    }
+  ]
+}

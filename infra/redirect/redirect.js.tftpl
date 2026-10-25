@@ -1,0 +1,24 @@
+// CloudFront supplies URL-encoded query keys and values: do not encode them again.
+function handler(event) {
+    var request = event.request;
+    var query = request.querystring || {};
+    var pairs = [];
+
+    Object.keys(query).forEach(function (key) {
+        var values = query[key].multiValue || [query[key]];
+        values.forEach(function (entry) {
+            pairs.push(key + '=' + entry.value);
+        });
+    });
+
+    return {
+        statusCode: 301,
+        statusDescription: 'Moved Permanently',
+        headers: {
+            location: {
+                value: ${target_origin} + request.uri +
+                    (pairs.length ? '?' + pairs.join('&') : '')
+            }
+        }
+    };
+}

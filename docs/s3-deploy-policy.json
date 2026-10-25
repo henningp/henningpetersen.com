@@ -2,7 +2,6 @@
   "Version": "2012-10-17",
   "Statement": [
     {
-      "Sid": "SiteCertificates",
       "Effect": "Allow",
       "Action": [
         "acm:DescribeCertificate",
@@ -15,7 +14,6 @@
       "Resource": "arn:aws:acm:us-east-1:528099663248:certificate/*"
     },
     {
-      "Sid": "SiteDistributions",
       "Effect": "Allow",
       "Action": [
         "cloudfront:GetDistribution",
@@ -32,7 +30,6 @@
       "Resource": "arn:aws:cloudfront::528099663248:distribution/*"
     },
     {
-      "Sid": "SiteOriginAccessControls",
       "Effect": "Allow",
       "Action": [
         "cloudfront:GetOriginAccessControl",
@@ -43,7 +40,6 @@
       "Resource": "arn:aws:cloudfront::528099663248:origin-access-control/*"
     },
     {
-      "Sid": "SiteHostedZone",
       "Effect": "Allow",
       "Action": [
         "route53:GetHostedZone",
@@ -55,13 +51,11 @@
       "Resource": "arn:aws:route53:::hostedzone/Z0326591QB2H1WSRQHAY"
     },
     {
-      "Sid": "PollDnsChanges",
       "Effect": "Allow",
       "Action": "route53:GetChange",
       "Resource": "arn:aws:route53:::change/*"
     },
     {
-      "Sid": "SiteBucket",
       "Effect": "Allow",
       "Action": [
         "s3:GetLifecycleConfiguration",
@@ -79,10 +73,12 @@
         "s3:GetBucket*",
         "s3:DeleteBucket"
       ],
-      "Resource": "arn:aws:s3:::henningpetersen-com"
+      "Resource": [
+        "arn:aws:s3:::henningpetersen-com",
+        "arn:aws:s3:::henningpetersen-com-media"
+      ]
     },
     {
-      "Sid": "SiteObjects",
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
@@ -92,7 +88,6 @@
       "Resource": "arn:aws:s3:::henningpetersen-com/*"
     },
     {
-      "Sid": "CreateAndListCloudFrontResources",
       "Effect": "Allow",
       "Action": [
         "cloudfront:CreateOriginAccessControl",
@@ -103,7 +98,6 @@
       "Resource": "*"
     },
     {
-      "Sid": "RequestAndListCertificates",
       "Effect": "Allow",
       "Action": [
         "acm:RequestCertificate",
@@ -117,28 +111,6 @@
       }
     },
     {
-      "Sid": "MediaBucketInfrastructure",
-      "Effect": "Allow",
-      "Action": [
-        "s3:CreateBucket",
-        "s3:DeleteBucket",
-        "s3:ListBucket",
-        "s3:GetBucket*",
-        "s3:PutBucket*",
-        "s3:DeleteBucketPolicy",
-        "s3:GetAccelerateConfiguration",
-        "s3:PutAccelerateConfiguration",
-        "s3:GetEncryptionConfiguration",
-        "s3:PutEncryptionConfiguration",
-        "s3:GetLifecycleConfiguration",
-        "s3:PutLifecycleConfiguration",
-        "s3:GetReplicationConfiguration",
-        "s3:PutReplicationConfiguration"
-      ],
-      "Resource": "arn:aws:s3:::henningpetersen-com-media"
-    },
-    {
-      "Sid": "ManageBackgroundPointer",
       "Effect": "Allow",
       "Action": [
         "s3:GetObject",
@@ -147,7 +119,6 @@
       "Resource": "arn:aws:s3:::henningpetersen-com-media/background.json"
     },
     {
-      "Sid": "BackgroundFunction",
       "Effect": "Allow",
       "Action": [
         "lambda:CreateFunction",
@@ -170,7 +141,6 @@
       "Resource": "arn:aws:lambda:eu-central-1:528099663248:function:henningpetersen-background-sync"
     },
     {
-      "Sid": "BackgroundSchedule",
       "Effect": "Allow",
       "Action": [
         "scheduler:CreateSchedule",
@@ -181,7 +151,6 @@
       "Resource": "arn:aws:scheduler:eu-central-1:528099663248:schedule/henningpetersen-backgrounds/daily-sync"
     },
     {
-      "Sid": "BackgroundScheduleGroup",
       "Effect": "Allow",
       "Action": [
         "scheduler:CreateScheduleGroup",
@@ -194,7 +163,6 @@
       "Resource": "arn:aws:scheduler:eu-central-1:528099663248:schedule-group/henningpetersen-backgrounds"
     },
     {
-      "Sid": "BackgroundLogGroup",
       "Effect": "Allow",
       "Action": [
         "logs:CreateLogGroup",
@@ -217,7 +185,6 @@
       ]
     },
     {
-      "Sid": "DiscoverFrankfurtLogGroups",
       "Effect": "Allow",
       "Action": "logs:DescribeLogGroups",
       "Resource": "*",
@@ -228,7 +195,6 @@
       }
     },
     {
-      "Sid": "ReadBackgroundExecutionRoles",
       "Effect": "Allow",
       "Action": "iam:GetRole",
       "Resource": [
@@ -237,7 +203,6 @@
       ]
     },
     {
-      "Sid": "PassBackgroundLambdaRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": "arn:aws:iam::528099663248:role/henningpetersen-background-lambda",
@@ -248,7 +213,6 @@
       }
     },
     {
-      "Sid": "PassBackgroundSchedulerRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
       "Resource": "arn:aws:iam::528099663248:role/henningpetersen-background-scheduler",
@@ -257,6 +221,71 @@
           "iam:PassedToService": "scheduler.amazonaws.com"
         }
       }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "route53:CreateHostedZone",
+        "route53:ListHostedZones",
+        "route53:ListHostedZonesByName"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "route53:GetHostedZone",
+        "route53:ListResourceRecordSets",
+        "route53:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:route53:::hostedzone/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "route53:ChangeTagsForResource",
+      "Resource": "arn:aws:route53:::hostedzone/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "route53:ChangeResourceRecordSets",
+      "Resource": "arn:aws:route53:::hostedzone/*",
+      "Condition": {
+        "ForAllValues:StringLike": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
+            "henningpetersen.de",
+            "www.henningpetersen.de",
+            "_*.henningpetersen.de"
+          ]
+        },
+        "ForAllValues:StringEquals": {
+          "route53:ChangeResourceRecordSetsRecordTypes": [
+            "A",
+            "AAAA",
+            "CNAME"
+          ]
+        },
+        "Null": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": "false",
+          "route53:ChangeResourceRecordSetsRecordTypes": "false"
+        }
+      }
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:DescribeFunction",
+        "cloudfront:GetFunction",
+        "cloudfront:UpdateFunction",
+        "cloudfront:PublishFunction",
+        "cloudfront:DeleteFunction",
+        "cloudfront:ListTagsForResource"
+      ],
+      "Resource": "arn:aws:cloudfront::528099663248:function/henningpetersen-de-redirect"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "cloudfront:CreateFunction",
+      "Resource": "*"
     }
   ]
 }

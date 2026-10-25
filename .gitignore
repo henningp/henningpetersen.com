@@ -4,6 +4,10 @@ dist
 infra/.terraform
 infra/terraform.tfstate*
 infra/*.tfvars
+infra/redirect/.terraform/
+infra/redirect/terraform.tfstate*
+infra/redirect/*.tfvars
+infra/redirect/*.tfplan
 .DS_Store
 .idea
 *.log
