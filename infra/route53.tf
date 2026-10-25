@@ -101,10 +101,8 @@ resource "aws_route53_record" "txt_apex" {
 # DMARC lives on its own name (_dmarc), so no apex collision -- allow_overwrite
 # just guards re-application.
 #
-# p=quarantine is a safe first posture: mail failing policy lands in spam rather
-# than being hard-bounced, and it won't disrupt a healthy Google inbox. After a
-# week or so of clean aggregate reports (delivered to the rua mailbox) you can
-# harden to p=reject -- or dial back to p=none to monitor only.
+# p=reject asks receivers to reject mail that fails DMARC. Legitimate senders
+# must pass aligned DKIM or SPF. Keep aggregate reports enabled for monitoring.
 resource "aws_route53_record" "dmarc" {
   zone_id = aws_route53_zone.site.id
   name    = "_dmarc.${var.domain}"
@@ -113,7 +111,7 @@ resource "aws_route53_record" "dmarc" {
   allow_overwrite = true
   ttl             = 300
   records = [
-    "v=DMARC1; p=quarantine; pct=100; rua=mailto:hp@henningpetersen.com",
+    "v=DMARC1; p=reject; pct=100; rua=mailto:hp@henningpetersen.com",
   ]
 }
 # Google DKIM: one TXT record containing two ordered character-strings.
