@@ -158,7 +158,8 @@ replace an already eligible same-day choice. View
 If the initial missing pointer was cached as a 403, CloudFront's default error
 cache can briefly delay the first publication too.
 
-No gallery or deletion UI is included yet. Only upload photos you are comfortable
+The optional [admin page](admin-iam/README.md) can list sources, edit captions,
+and remove them from future rotation. Only upload photos you are comfortable
 making public: generated copies are public even though originals remain private.
 
 ## Manual caption tests
@@ -168,7 +169,7 @@ The deployer has permanent `s3:GetObject` / `s3:PutObject` permission on exactly
 source uploads, or private inventory. It is **not** a persistent per-photo edit:
 the next successful processor run restores captions from source metadata (or
 removes the test caption if the source has none). Use the labelled upload workflow
-for permanent captions.
+or the admin page for permanent captions.
 
 1. Verify `AWS_PROFILE=henning-site aws sts get-caller-identity`. From the repository
    root, download a backup and note the **ETag** in the command's JSON response:

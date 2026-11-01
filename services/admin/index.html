@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Background administration</title>
+  <style>
+    :root { font: 16px system-ui, sans-serif; color-scheme: light dark; }
+    body { max-width: 100rem; margin: 2rem auto; padding: 0 1rem; }
+    h1 { margin-bottom: .4rem; }
+    p { line-height: 1.5; }
+    .table { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border-bottom: 1px solid #8886; padding: .6rem; text-align: left; vertical-align: top; }
+    th button { font: inherit; font-weight: 700; white-space: nowrap; }
+    img { width: 160px; height: 100px; object-fit: contain; }
+    input { box-sizing: border-box; width: 13rem; max-width: 100%; }
+    button, input { padding: .4rem; }
+    td button { margin: .15rem; }
+    .key { max-width: 18rem; overflow-wrap: anywhere; }
+    #status { min-height: 1.5em; }
+  </style>
+</head>
+<body>
+  <h1>Background images</h1>
+  <p>Each row is one uploaded source. Changes take effect after the next successful daily run. Removing one duplicate does not remove other copies. If the pool becomes empty, the last published background remains visible.</p>
+  <button id="refresh" type="button">Refresh</button>
+  <p id="status" role="status" aria-live="polite"></p>
+  <div class="table"><table>
+    <thead><tr>
+      <th>Image</th><th><button type="button" data-sort="key">Source ↕</button></th>
+      <th><button type="button" data-sort="en">English ↕</button></th>
+      <th><button type="button" data-sort="de">Deutsch ↕</button></th>
+      <th><button type="button" data-sort="year">Year ↕</button></th>
+      <th><button type="button" data-sort="size">Size ↕</button></th>
+      <th><button type="button" data-sort="modified">Modified ↕</button></th><th>Actions</th>
+    </tr></thead>
+    <tbody id="images"></tbody>
+  </table></div>
+  <script>
+    const status = document.querySelector('#status');
+    const tbody = document.querySelector('#images');
+    let images = [], sort = 'key', direction = 1;
+    const text = (tag, value) => { const el = document.createElement(tag); el.textContent = value; return el; };
+    async function request(path, body) {
+      const options = body ? { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Request': '1' }, body: JSON.stringify(body) } : {};
+      const response = await fetch(path, { ...options, cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+    async function refresh(message = '') {
+      status.textContent = 'Loading…';
+      try { images = (await request('/admin/images')).images; render(); status.textContent = message || `${images.length} images`; }
+      catch (error) { status.textContent = error.message; }
+    }
+    function render() {
+      tbody.replaceChildren();
+      const value = image => sort === 'en' || sort === 'de' ? image.label?.[sort] || '' : image[sort] ?? '';
+      const ordered = [...images].sort((a, b) => direction * (typeof value(a) === 'number' && typeof value(b) === 'number' ? value(a) - value(b) : String(value(a)).localeCompare(String(value(b)), undefined, { numeric: true })));
+      for (const image of ordered) {
+        const row = document.createElement('tr');
+        const preview = document.createElement('img'); preview.src = image.image; preview.alt = ''; preview.referrerPolicy = 'no-referrer';
+        const imageCell = document.createElement('td'); imageCell.append(preview); row.append(imageCell);
+        const key = text('td', image.key); key.className = 'key'; row.append(key);
+        const fields = {};
+        for (const lang of ['en', 'de']) {
+          const cell = document.createElement('td'); const input = document.createElement('input');
+          input.value = image.label?.[lang] || ''; input.maxLength = 120; input.setAttribute('aria-label', `${lang.toUpperCase()} label for ${image.key}`);
+          input.addEventListener('input', () => { image.label ??= {}; image.label[lang] = input.value; });
+          fields[lang] = input; cell.append(input); row.append(cell);
+        }
+        row.append(text('td', image.year ?? '—'), text('td', `${(image.size / 1024 / 1024).toFixed(2)} MiB`), text('td', image.modified.slice(0, 10)));
+        const actions = document.createElement('td');
+        const save = text('button', 'Save labels'); save.type = 'button';
+        const remove = text('button', 'Remove'); remove.type = 'button';
+        const change = async (path, extra = {}) => {
+          save.disabled = remove.disabled = true; status.textContent = 'Saving…';
+          try { await request(path, { key: image.key, version: image.version, ...extra }); await refresh('Saved. Changes apply on the next successful daily run.'); }
+          catch (error) { status.textContent = error.message; save.disabled = remove.disabled = false; }
+        };
+        save.addEventListener('click', () => change('/admin/labels', { labels: { en: fields.en.value, de: fields.de.value } }));
+        remove.addEventListener('click', () => { if (confirm(`Remove this source from future rotation?\n\n${image.key}`)) change('/admin/remove'); });
+        actions.append(save, remove); row.append(actions); tbody.append(row);
+      }
+    }
+    document.querySelectorAll('[data-sort]').forEach(button => button.addEventListener('click', () => {
+      if (sort === button.dataset.sort) direction *= -1; else { sort = button.dataset.sort; direction = 1; }
+      render();
+    }));
+    document.querySelector('#refresh').addEventListener('click', () => refresh());
+    refresh();
+  </script>
+</body>
+</html>

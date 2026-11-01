@@ -1,0 +1,30 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageAdminFunction",
+      "Effect": "Allow",
+      "Action": ["lambda:CreateFunction", "lambda:GetFunction", "lambda:GetFunctionConfiguration", "lambda:GetFunctionCodeSigningConfig", "lambda:GetFunctionConcurrency", "lambda:GetRuntimeManagementConfig", "lambda:ListVersionsByFunction", "lambda:ListTags", "lambda:UpdateFunctionCode", "lambda:UpdateFunctionConfiguration", "lambda:DeleteFunction", "lambda:TagResource", "lambda:UntagResource", "lambda:GetPolicy", "lambda:AddPermission", "lambda:RemovePermission"],
+      "Resource": "arn:aws:lambda:eu-central-1:528099663248:function:henningpetersen-background-admin"
+    },
+    {
+      "Sid": "ReadAdminExecutionRole",
+      "Effect": "Allow",
+      "Action": "iam:GetRole",
+      "Resource": "arn:aws:iam::528099663248:role/henningpetersen-background-admin"
+    },
+    {
+      "Sid": "PassAdminExecutionRole",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::528099663248:role/henningpetersen-background-admin",
+      "Condition": { "StringEquals": { "iam:PassedToService": "lambda.amazonaws.com" } }
+    },
+    {
+      "Sid": "ManageAdminLogGroup",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup", "logs:DeleteLogGroup", "logs:PutRetentionPolicy", "logs:DeleteRetentionPolicy", "logs:ListTagsForResource", "logs:TagResource", "logs:UntagResource", "logs:ListTagsLogGroup", "logs:TagLogGroup", "logs:UntagLogGroup", "logs:DescribeLogStreams", "logs:GetLogEvents", "logs:FilterLogEvents"],
+      "Resource": ["arn:aws:logs:eu-central-1:528099663248:log-group:/aws/lambda/henningpetersen-background-admin", "arn:aws:logs:eu-central-1:528099663248:log-group:/aws/lambda/henningpetersen-background-admin:*"]
+    }
+  ]
+}

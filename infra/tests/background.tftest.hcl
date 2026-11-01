@@ -1,4 +1,8 @@
 # Entirely mocked: no AWS credentials, API requests, or live state are used.
+variables {
+  enable_background_admin = false
+}
+
 mock_provider "aws" {
   override_data {
     target = data.aws_iam_role.background_upload

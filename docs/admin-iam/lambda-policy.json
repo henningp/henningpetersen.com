@@ -1,0 +1,39 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadAdminCredentials",
+      "Effect": "Allow",
+      "Action": "ssm:GetParameter",
+      "Resource": [
+        "arn:aws:ssm:eu-central-1:528099663248:parameter/henningpetersen/backgrounds/admin-user",
+        "arn:aws:ssm:eu-central-1:528099663248:parameter/henningpetersen/backgrounds/admin-password-sha256"
+      ]
+    },
+    {
+      "Sid": "ListIncomingOnly",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::henningpetersen-com-media",
+      "Condition": { "StringLike": { "s3:prefix": "incoming/*" } }
+    },
+    {
+      "Sid": "ManageIncomingSources",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:GetObjectTagging", "s3:PutObjectTagging"],
+      "Resource": "arn:aws:s3:::henningpetersen-com-media/incoming/*"
+    },
+    {
+      "Sid": "ReadInventory",
+      "Effect": "Allow",
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::henningpetersen-com-media/state/inventory.json"
+    },
+    {
+      "Sid": "WriteAdminLogs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:eu-central-1:528099663248:log-group:/aws/lambda/henningpetersen-background-admin:log-stream:*"
+    }
+  ]
+}

@@ -62,6 +62,7 @@ planning:
 ```sh
 pnpm build:background
 pnpm build:upload
+# Also run pnpm build:admin if background admin is enabled.
 export AWS_PROFILE=henning-site
 cd infra
 terraform init
@@ -122,6 +123,10 @@ and its [additional IAM prerequisites](docs/upload-iam/README.md). The Shortcut 
 created in the Mac app and synced through your own iCloud account; no publishing
 or AWS credentials on devices are needed. The upload endpoint is separate from
 the public website and requires a personal token. Manual S3 uploads still work.
+
+An optional password-protected `/admin` page lists incoming images and can edit
+captions or remove sources from future rotation. It requires separate
+[admin IAM setup and deployment](docs/admin-iam/README.md).
 
 ## Cost (at near-zero traffic)
 

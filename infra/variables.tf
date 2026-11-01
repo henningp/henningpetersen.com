@@ -24,3 +24,9 @@ variable "media_bucket_name" {
   type        = string
   default     = "henningpetersen-com-media"
 }
+
+variable "enable_background_admin" {
+  description = "Enable the separately bootstrapped background administration endpoint"
+  type        = bool
+  default     = false
+}

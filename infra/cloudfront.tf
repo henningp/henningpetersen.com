@@ -45,6 +45,20 @@ resource "aws_cloudfront_distribution" "site" {
     origin_access_control_id = aws_cloudfront_origin_access_control.media.id
   }
 
+  dynamic "origin" {
+    for_each = var.enable_background_admin ? [1] : []
+    content {
+      domain_name = trimprefix(aws_apigatewayv2_api.background_admin[0].api_endpoint, "https://")
+      origin_id   = "background-admin"
+      custom_origin_config {
+        http_port              = 80
+        https_port             = 443
+        origin_protocol_policy = "https-only"
+        origin_ssl_protocols   = ["TLSv1.2"]
+      }
+    }
+  }
+
   ordered_cache_behavior {
     path_pattern           = "background.json"
     target_origin_id       = "s3-${var.media_bucket_name}"
@@ -77,6 +91,28 @@ resource "aws_cloudfront_distribution" "site" {
       query_string = false
       cookies {
         forward = "none"
+      }
+    }
+  }
+
+  dynamic "ordered_cache_behavior" {
+    for_each = var.enable_background_admin ? ["admin", "admin/*"] : []
+    content {
+      path_pattern           = ordered_cache_behavior.value
+      target_origin_id       = "background-admin"
+      viewer_protocol_policy = "https-only"
+      allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+      cached_methods         = ["GET", "HEAD"]
+      compress               = true
+      min_ttl                = 0
+      default_ttl            = 0
+      max_ttl                = 0
+      forwarded_values {
+        query_string = false
+        headers      = ["Authorization", "Content-Type", "Origin", "X-Admin-Request"]
+        cookies {
+          forward = "none"
+        }
       }
     }
   }

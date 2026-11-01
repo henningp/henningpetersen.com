@@ -1,4 +1,8 @@
 # No AWS access or live state; this file exercises only mocked operations.
+variables {
+  enable_background_admin = false
+}
+
 mock_provider "aws" {
   mock_data "aws_iam_role" {
     defaults = {
