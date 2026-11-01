@@ -72,4 +72,5 @@ logging that could record credentials, image names or signed URLs.
 - Each save or removal refreshes the table, discarding other unsaved edits. Pending
   images use five-minute signed URLs for private originals, including embedded
   metadata; don't share those URLs. Refresh expired previews. Some original formats
-  may not display. The list is intended for a small photo pool.
+  may not display. Click a thumbnail to enlarge it; click again or press Escape to
+  close it. The list is intended for a small photo pool.

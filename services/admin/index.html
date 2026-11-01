@@ -14,12 +14,18 @@
     table { border-collapse: collapse; width: 100%; }
     th, td { border-bottom: 1px solid #8886; padding: .6rem; text-align: left; vertical-align: top; }
     th button { font: inherit; font-weight: 700; white-space: nowrap; }
-    img { width: 160px; height: 100px; object-fit: contain; }
+    td img { width: 160px; height: 100px; object-fit: contain; }
     input { box-sizing: border-box; width: 13rem; max-width: 100%; }
     button, input { padding: .4rem; }
     td button { margin: .15rem; }
     .key { max-width: 18rem; overflow-wrap: anywhere; }
     #status { min-height: 1.5em; }
+    .preview-button { padding: 0; border: 0; background: transparent; cursor: zoom-in; }
+    #image-viewer { position: fixed; inset: 0; box-sizing: border-box; width: 100vw; height: 100vh; height: 100dvh; max-width: none; max-height: none; margin: auto; padding: 3rem 1rem 1rem; border: 0; background: rgba(0, 0, 0, .94); color: white; cursor: zoom-out; }
+    #image-viewer[open] { display: flex; align-items: center; justify-content: center; }
+    #image-viewer::backdrop { background: rgba(0, 0, 0, .94); }
+    #full-image { width: auto; height: auto; max-width: 100%; max-height: 100%; object-fit: contain; }
+    #close-image { position: absolute; top: .75rem; right: .75rem; cursor: pointer; }
   </style>
 </head>
 <body>
@@ -38,9 +44,16 @@
     </tr></thead>
     <tbody id="images"></tbody>
   </table></div>
+  <dialog id="image-viewer" aria-label="Image preview">
+    <button id="close-image" type="button" autofocus>Close</button>
+    <img id="full-image" alt="" referrerpolicy="no-referrer">
+  </dialog>
   <script>
     const status = document.querySelector('#status');
     const tbody = document.querySelector('#images');
+    const viewer = document.querySelector('#image-viewer');
+    const fullImage = document.querySelector('#full-image');
+    viewer.addEventListener('click', () => viewer.close());
     let images = [], sort = 'key', direction = 1;
     const text = (tag, value) => { const el = document.createElement(tag); el.textContent = value; return el; };
     async function request(path, body) {
@@ -62,7 +75,14 @@
       for (const image of ordered) {
         const row = document.createElement('tr');
         const preview = document.createElement('img'); preview.src = image.image; preview.alt = ''; preview.referrerPolicy = 'no-referrer';
-        const imageCell = document.createElement('td'); imageCell.append(preview); row.append(imageCell);
+        const previewButton = document.createElement('button'); previewButton.type = 'button'; previewButton.className = 'preview-button';
+        previewButton.setAttribute('aria-label', `View ${image.key} larger`);
+        previewButton.addEventListener('click', () => {
+          fullImage.src = image.image; fullImage.alt = image.label?.en || image.label?.de || image.key;
+          viewer.showModal();
+        });
+        previewButton.append(preview);
+        const imageCell = document.createElement('td'); imageCell.append(previewButton); row.append(imageCell);
         const key = text('td', image.key); key.className = 'key'; row.append(key);
         const fields = {};
         for (const lang of ['en', 'de']) {
