@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
+import { stripTypeScriptTypes } from "node:module";
 import vm from "node:vm";
-import ts from "typescript";
 import { getDefaultLocale, getLocale, isLocale, saveLocale } from "../src/locale.ts";
 import { pickGreeting } from "../src/config.ts";
 
@@ -60,6 +60,7 @@ test("initialization and greeting refresh never persist; switching works without
   // Exercise the page's actual locale wiring, without importing its unrelated background updater.
   const script = page.slice(page.indexOf("      (function () {", page.indexOf('import { pickGreeting')),
     page.indexOf("    </script>", page.indexOf('import { pickGreeting')));
+  const scriptJs = stripTypeScriptTypes(script);
   for (const blocked of [false, true]) {
     const storage = memoryStorage();
     const access = () => { if (blocked) throw new Error("Storage blocked"); return storage; };
@@ -75,9 +76,7 @@ test("initialization and greeting refresh never persist; switching works without
     let refresh;
     const captionLocales = [];
     let hour = 8;
-    vm.runInNewContext(ts.transpileModule(script, {
-      compilerOptions: { target: ts.ScriptTarget.ESNext },
-    }).outputText, {
+    vm.runInNewContext(scriptJs, {
       document: {
         documentElement: {
           getAttribute(name) { return attributes.get(name) ?? null; },

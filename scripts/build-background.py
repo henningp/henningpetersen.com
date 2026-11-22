@@ -11,12 +11,13 @@ ROOT = Path(__file__).resolve().parent.parent
 SOURCE = ROOT / "services/background"
 OUTPUT = ROOT / ".artifacts/background-sync.zip"
 # Pin the binary artifact as well as the package version.
-WHEEL = "pillow-12.3.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
-SHA256 = "0847a763afefb695bc912d7c131e7e0632d4edc1d8698f58ddabec8e46b8b6d3"
+PILLOW_VERSION = "13.0.0"
+WHEEL = f"pillow-{PILLOW_VERSION}-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"
+SHA256 = "5f56499c1a74d2b862beb0c33b8016f99d095858455df9d21583bbbc1c15b582"
 
 
 def build():
-    with urllib.request.urlopen("https://pypi.org/pypi/Pillow/12.3.0/json", timeout=30) as response:
+    with urllib.request.urlopen(f"https://pypi.org/pypi/Pillow/{PILLOW_VERSION}/json", timeout=30) as response:
         metadata = json.load(response)
     url = next(item["url"] for item in metadata["urls"] if item["filename"] == WHEEL)
     with urllib.request.urlopen(url, timeout=120) as response:

@@ -14,6 +14,8 @@ to email; the visible message links to <https://daenen4.de>.
 
 ## Local development
 
+Use Node.js 22.23.4 or newer.
+
 ```sh
 pnpm install
 pnpm dev           # http://localhost:4321

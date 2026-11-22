@@ -44,11 +44,11 @@ import { SITE } from "../config";
         </h1>
 
         <p data-locale-content="en">
-          This domain is currently used for email only. My work website is at
+          This domain is currently used for email only. My work website is at{" "}
           <a class="domain-link" href={SITE.companyUrl}>{SITE.companyLabel}</a>.
         </p>
         <p data-locale-content="de" hidden>
-          Diese Domain wird im Moment nur für E-Mail benutzt. Meine berufliche Website findet sich unter
+          Diese Domain wird im Moment nur für E-Mail benutzt. Meine berufliche Website findet sich unter{" "}
           <a class="domain-link" href={SITE.companyUrl}>{SITE.companyLabel}</a>.
         </p>
 
@@ -138,13 +138,13 @@ import { SITE } from "../config";
             <p data-locale-content="en">
               This is based on our legitimate interest in operating the site and
               serving the content you request (Art. 6(1)(f) GDPR). Questions
-              about this or your rights:
+              about this or your rights:{" "}
               <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.
             </p>
             <p data-locale-content="de" hidden>
               Rechtsgrundlage ist unser berechtigtes Interesse am Betrieb der
               Website und der Bereitstellung der von Ihnen angeforderten Inhalte
-              (Art. 6 Abs. 1 lit. f DSGVO). Fragen dazu oder zu Ihren Rechten:
+              (Art. 6 Abs. 1 lit. f DSGVO). Fragen dazu oder zu Ihren Rechten:{" "}
               <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.
             </p>
           </div>
@@ -228,9 +228,9 @@ import { SITE } from "../config";
     <style>
       :root {
         --bg: #f4f5f7;
-        --photo-overlay: rgb(244 245 247 / 50%);
+        --photo-overlay: color-mix(in srgb, var(--bg) 50%, transparent);
         --caption-shadow: rgb(255 255 255 / 60%);
-        --card: #ffffff;
+        --card: rgb(255 255 255 / 72%);
         --text: #1a1d23;
         --muted: #5c6370;
         --border: #dfe2e8;
@@ -238,14 +238,15 @@ import { SITE } from "../config";
         --accent-contrast: #ffffff;
         --btn-text: #1a1d23;
         --btn-border: #cfd4dc;
+        --footer-label: #414651;
         --footer-underline: color-mix(in srgb, var(--text) 25%, transparent);
+        --focus-width: 2px;
       }
       @media (prefers-color-scheme: dark) {
         :root {
           --bg: #101216;
-          --photo-overlay: rgb(16 18 22 / 50%);
           --caption-shadow: rgb(0 0 0 / 60%);
-          --card: #181b21;
+          --card: rgb(24 27 33 / 84%);
           --text: #e7e9ee;
           --muted: #9aa1ad;
           --border: #2a2e36;
@@ -253,7 +254,7 @@ import { SITE } from "../config";
           --accent-contrast: #0b0d12;
           --btn-text: #e7e9ee;
           --btn-border: #3a3f4a;
-          --footer-underline: var(--border);
+          --footer-label: #bfc5d0;
         }
       }
 
@@ -338,11 +339,6 @@ import { SITE } from "../config";
       header {
         padding: 1rem 1.5rem 0;
       }
-      /* Text outside the solid card needs full contrast over the photo. */
-      .lang-toggle,
-      footer {
-        --muted: var(--text);
-      }
       .lang-toggle {
         display: inline-flex;
         align-items: center;
@@ -354,7 +350,7 @@ import { SITE } from "../config";
         appearance: none;
         border: 0;
         background: transparent;
-        color: var(--muted);
+        color: var(--text);
         font: inherit;
         padding: 0.25rem 0.5rem;
         border-radius: 0.4rem;
@@ -365,11 +361,7 @@ import { SITE } from "../config";
         font-weight: 600;
         background: color-mix(in srgb, var(--text) 8%, transparent);
       }
-      .lang-toggle button:hover {
-        color: var(--text);
-      }
       .lang-sep {
-        color: var(--muted);
         opacity: 0.6;
       }
 
@@ -410,7 +402,7 @@ import { SITE } from "../config";
         text-underline-offset: 2px;
       }
       .card p a.domain-link:hover {
-        color: color-mix(in srgb, var(--accent), black 12%);
+        text-decoration-thickness: 2px;
       }
 
       .actions {
@@ -455,24 +447,40 @@ import { SITE } from "../config";
       }
       .btn:focus-visible,
       .card p a.domain-link:focus-visible,
-      .lang-toggle button:focus-visible {
-        outline: 2px solid var(--accent);
+      .lang-toggle button:focus-visible,
+      footer a:focus-visible,
+      footer summary:focus-visible {
+        outline: var(--focus-width) solid var(--text);
         outline-offset: 2px;
       }
 
       footer {
+        position: relative;
+        isolation: isolate;
         padding: 0 1.5rem 2rem;
         text-align: center;
         font-size: 0.85rem;
-        color: var(--muted);
+      }
+      /* Keep the background clear until a legal disclosure is opened. */
+      footer:has(> .imprint[open])::before {
+        content: "";
+        position: absolute;
+        inset: -1rem 0 0;
+        z-index: -1;
+        pointer-events: none;
+        background: var(--photo-overlay);
+        mask-image:
+          linear-gradient(to right, transparent, black 1.5rem, black calc(100% - 1.5rem), transparent),
+          linear-gradient(transparent, black 1.5rem, black calc(100% - 1.5rem), transparent);
+        mask-composite: intersect;
       }
       footer a {
-        color: var(--muted);
+        color: inherit;
         text-decoration: none;
         border-bottom: 1px solid var(--footer-underline);
       }
       footer a:hover {
-        color: var(--text);
+        border-bottom-color: currentColor;
       }
 
       footer .imprint {
@@ -481,7 +489,7 @@ import { SITE } from "../config";
       footer .imprint > summary {
         display: inline;
         cursor: pointer;
-        color: var(--muted);
+        color: var(--footer-label);
         text-decoration: none;
         border-bottom: 1px solid var(--footer-underline);
         list-style: none;
@@ -489,15 +497,58 @@ import { SITE } from "../config";
       footer .imprint > summary::-webkit-details-marker {
         display: none;
       }
-      footer .imprint > summary:hover
+      footer .imprint > summary:hover,
+      footer .imprint > summary:focus-visible,
       footer .imprint[open] > summary {
         color: var(--text);
+        border-bottom-color: currentColor;
       }
       footer .imprint-body {
         margin-top: 0.75rem;
       }
       footer .imprint-body address {
         font-style: normal;
+      }
+
+      @media (prefers-contrast: more) {
+        :root {
+          --bg: #ffffff;
+          --text: #000000;
+          --accent: #003381;
+          --accent-contrast: #ffffff;
+        }
+      }
+      @media (prefers-contrast: more) and (prefers-color-scheme: dark) {
+        :root {
+          --bg: #000000;
+          --text: #ffffff;
+          --accent: #b9d3ff;
+          --accent-contrast: #000000;
+        }
+      }
+      @media (prefers-contrast: more), (forced-colors: active) {
+        :root {
+          --card: var(--bg);
+          --muted: var(--text);
+          --border: var(--text);
+          --btn-border: var(--text);
+          --btn-text: var(--text);
+          --footer-label: var(--text);
+          --footer-underline: currentColor;
+          --focus-width: 3px;
+        }
+        .background,
+        .background-caption,
+        footer::before {
+          display: none;
+        }
+        .card {
+          box-shadow: none;
+        }
+        .lang-toggle button[aria-pressed="true"] {
+          text-decoration: underline;
+          text-underline-offset: 0.2em;
+        }
       }
     </style>
   </body>
