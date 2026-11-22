@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { backgroundCaption, backgroundPath, createBackgroundCaption, createBackgroundUpdater } from "../src/background.ts";
+import { backgroundCaption, backgroundPath, createBackgroundUpdater } from "../src/background.ts";
 
 const first = `/photos/${"a".repeat(64)}.jpg`;
 const second = `/photos/${"b".repeat(64)}.jpg`;
@@ -31,53 +31,34 @@ test("captions support both languages, partial metadata, and empty fallback", ()
   }
 });
 
-test("caption rendering uses plain text and updates immediately on language changes", () => {
-  const element = { textContent: "", hidden: true, lang: "" };
-  const caption = createBackgroundCaption(element, "en");
-  caption.update({ label: { en: "<b>Lake</b>", de: "See" }, year: 2012 });
-  assert.equal(element.textContent, "<b>Lake</b>, 2012");
-  assert.equal(element.hidden, false);
-  caption.setLocale("de");
-  assert.equal(element.textContent, "See, 2012");
-  assert.equal(element.lang, "de");
-  caption.update({ label: { en: "Lake" } });
-  assert.equal(element.lang, "en");
-  caption.update({});
-  assert.equal(element.textContent, "");
-  assert.equal(element.hidden, true);
-  assert.doesNotThrow(() => createBackgroundCaption(null, "en").update({}));
-});
-
-test("caption and photo commit together; same-photo captions refresh and missing captions clear", async () => {
+test("publishes caption data only after the photo succeeds, including same-photo metadata updates", async () => {
   const target = image();
-  const element = { textContent: "", hidden: true };
-  const caption = createBackgroundCaption(element, "en");
+  const published = [];
   let selection = { src: first, label: { en: "First" } };
   let broken = false;
   let loads = 0;
   const update = createBackgroundUpdater(target, async () => Response.json(selection), async () => {
     loads++;
     if (broken) throw new Error("offline");
-    assert.equal(element.textContent, "");
-  }, caption);
+    assert.deepEqual(published, []);
+  }, (photo) => published.push({ src: target.src, photo }));
   await update();
-  assert.equal(element.textContent, "First");
+  assert.deepEqual(published, [{ src: first, photo: selection }]);
   selection = { src: second, label: { en: "Second" } };
   broken = true;
   assert.equal(await update(), false);
   assert.equal(target.src, first);
-  assert.equal(element.textContent, "First");
+  assert.equal(published.length, 1);
   selection = { src: first, label: { en: "Updated" } };
   await update();
-  assert.equal(element.textContent, "Updated");
+  assert.deepEqual(published.at(-1), { src: first, photo: selection });
   assert.equal(loads, 2);
   selection = { src: first };
   await update();
-  assert.equal(element.hidden, true);
-  assert.equal(element.textContent, "");
+  assert.deepEqual(published.at(-1), { src: first, photo: selection });
   selection = { src: "/incoming/unsafe.jpg", label: { en: "Must not appear" } };
   assert.equal(await update(), false);
-  assert.equal(element.hidden, true);
+  assert.equal(published.length, 3);
 });
 
 test("loads before displaying and does not reload an unchanged selection", async () => {

@@ -27,22 +27,6 @@ export function backgroundCaption(value: unknown, locale: Locale): { text: strin
   return { text: [place, year].filter(Boolean).join(", "), lang: place && !preferred ? other : locale };
 }
 
-export function createBackgroundCaption(element: HTMLElement | null, initialLocale: Locale) {
-  let selection: unknown = null;
-  let locale = initialLocale;
-  function render() {
-    if (!element) return;
-    const caption = backgroundCaption(selection, locale);
-    element.textContent = caption.text;
-    element.lang = caption.lang;
-    element.hidden = !caption.text;
-  }
-  return {
-    update(value: unknown) { selection = value; render(); },
-    setLocale(value: Locale) { locale = value; render(); },
-  };
-}
-
 function preloadPhoto(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const photo = new Image();
@@ -66,7 +50,7 @@ export function createBackgroundUpdater(
   image: HTMLImageElement,
   fetcher: typeof fetch = fetch,
   preload: (src: string) => Promise<void> = preloadPhoto,
-  caption?: ReturnType<typeof createBackgroundCaption>,
+  onPhotoLoaded?: (value: unknown) => void,
 ) {
   let current: string | null = null;
   let pending = false;
@@ -92,7 +76,7 @@ export function createBackgroundUpdater(
         current = src;
       }
       // Commit caption only after the image succeeds; refresh even for the same URL.
-      caption?.update(selection);
+      onPhotoLoaded?.(selection);
       return true;
     } catch {
       // Missing initial selection, offline, invalid JSON, image failure: no broken UI.

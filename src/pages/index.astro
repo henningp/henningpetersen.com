@@ -28,7 +28,7 @@ import { SITE } from "../config";
       <img id="background-photo" alt="" decoding="async" />
       <div class="background-scrim"></div>
     </div>
-    <header>
+    <header data-photo-view-content>
       <nav aria-label="Language" class="lang-toggle">
         <button type="button" data-choose-locale="en" aria-pressed="false">EN</button>
         <span class="lang-sep" aria-hidden="true">/</span>
@@ -36,7 +36,7 @@ import { SITE } from "../config";
       </nav>
     </header>
 
-    <main>
+    <main data-photo-view-content>
       <section class="card" aria-live="polite">
         <h1>
           <span class="greeting" data-locale-content="en">Good afternoon!</span>
@@ -151,19 +151,24 @@ import { SITE } from "../config";
         </details>
       </footer>
     </main>
-    <p id="background-caption" class="background-caption" hidden></p>
+    <button type="button" id="photo-view-toggle" class="background-caption" hidden>
+      <span id="background-caption"></span>
+    </button>
 
     <script>
       import { pickGreeting, type Locale } from "../config";
       import { getLocale, isLocale, saveLocale } from "../locale";
-      import { createBackgroundCaption, createBackgroundUpdater } from "../background";
+      import { createBackgroundUpdater } from "../background";
+      import { createPhotoView } from "../photo-view";
 
-      const backgroundCaption = createBackgroundCaption(
-        document.querySelector<HTMLElement>("#background-caption"), getLocale(),
-      );
+      const photoToggle = document.querySelector<HTMLButtonElement>("#photo-view-toggle");
+      const caption = document.querySelector<HTMLElement>("#background-caption");
+      const photoView = photoToggle && caption ? createPhotoView(
+        photoToggle, caption, document.querySelectorAll<HTMLElement>("[data-photo-view-content]"), getLocale(),
+      ) : null;
       const background = document.querySelector<HTMLImageElement>("#background-photo");
       if (background) {
-        const updateBackground = createBackgroundUpdater(background, fetch, undefined, backgroundCaption);
+        const updateBackground = createBackgroundUpdater(background, fetch, undefined, photoView?.update);
         void updateBackground();
         setInterval(() => {
           if (document.visibilityState === "visible") void updateBackground();
@@ -203,7 +208,7 @@ import { SITE } from "../config";
           document.title = "Henning Petersen";
 
           updateGreeting(loc);
-          backgroundCaption.setLocale(loc);
+          photoView?.setLocale(loc);
         }
 
         document.querySelectorAll("[data-choose-locale]").forEach(function (btn) {
@@ -241,6 +246,7 @@ import { SITE } from "../config";
         --footer-label: #414651;
         --footer-underline: color-mix(in srgb, var(--text) 25%, transparent);
         --focus-width: 2px;
+        --photo-view-fade: 250ms ease;
       }
       @media (prefers-color-scheme: dark) {
         :root {
@@ -308,19 +314,52 @@ import { SITE } from "../config";
       }
       .background-scrim {
         background: var(--photo-overlay);
+        transition: opacity var(--photo-view-fade);
+      }
+      [data-photo-view-content] {
+        transition: opacity var(--photo-view-fade), visibility var(--photo-view-fade);
+      }
+      :root[data-photo-view] {
+        overflow: hidden;
+      }
+      [data-photo-view] .background-scrim,
+      [data-photo-view] [data-photo-view-content] {
+        opacity: 0;
+      }
+      [data-photo-view] [data-photo-view-content] {
+        visibility: hidden;
       }
       .background-caption {
         position: fixed;
         right: max(1rem, env(safe-area-inset-right));
         bottom: max(1rem, env(safe-area-inset-bottom));
         max-width: min(28rem, calc(100% - 2rem));
+        min-height: 1.5rem;
         margin: 0;
         padding: 0.3rem 0.65rem;
+        border: 0;
         border-radius: 0.4rem;
+        background: transparent;
         text-shadow: 0 1px 3px var(--caption-shadow);
         color: var(--text);
+        font: inherit;
         font-size: 0.75rem;
         overflow-wrap: anywhere;
+        text-align: right;
+        text-decoration: underline var(--footer-underline);
+        text-decoration-thickness: 1px;
+        text-underline-offset: 2px;
+        cursor: pointer;
+      }
+      .background-caption:hover,
+      .background-caption:focus-visible {
+        text-decoration-color: currentColor;
+      }
+      [data-photo-view] .background-caption {
+        position: fixed;
+        margin: 0;
+        background: color-mix(in srgb, var(--bg) 88%, transparent);
+        text-shadow: none;
       }
       /* Keep long captions out of the footer's way on small screens. */
       @media (max-width: 40rem), (max-height: 35rem) {
@@ -331,6 +370,9 @@ import { SITE } from "../config";
         }
       }
       @media (prefers-reduced-motion: reduce) {
+        :root {
+          --photo-view-fade: 0s;
+        }
         .background img {
           transition: none;
         }
@@ -448,6 +490,7 @@ import { SITE } from "../config";
       .btn:focus-visible,
       .card p a.domain-link:focus-visible,
       .lang-toggle button:focus-visible,
+      .background-caption:focus-visible,
       footer a:focus-visible,
       footer summary:focus-visible {
         outline: var(--focus-width) solid var(--text);
@@ -536,6 +579,7 @@ import { SITE } from "../config";
           --footer-label: var(--text);
           --footer-underline: currentColor;
           --focus-width: 3px;
+          --photo-view-fade: 0s;
         }
         .background,
         .background-caption,

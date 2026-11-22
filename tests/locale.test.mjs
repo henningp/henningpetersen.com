@@ -92,7 +92,7 @@ test("initialization and greeting refresh never persist; switching works without
       saveLocale: (locale) => saveLocale(locale, "de", access),
       isLocale,
       pickGreeting,
-      backgroundCaption: { setLocale(locale) { captionLocales.push(locale); } },
+      photoView: { setLocale(locale) { captionLocales.push(locale); } },
       Date: class { getHours() { return hour; } },
       setInterval(callback, delay) { assert.equal(delay, 60000); refresh = callback; },
     });
